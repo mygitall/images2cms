@@ -56,6 +56,18 @@ foreach (['daily_limit INT DEFAULT NULL', 'total_limit INT DEFAULT NULL'] as $co
 // gen_images 软删除字段
 try { $pdo->exec("ALTER TABLE `gen_images` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL"); } catch (PDOException $e) {}
 
+// 登录日志表
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS `login_logs` (
+    `id`         INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id`    INT NOT NULL,
+    `ip`         VARCHAR(45) DEFAULT '',
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_user_time` (`user_id`, `created_at`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // API 调用日志表
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS `api_logs` (

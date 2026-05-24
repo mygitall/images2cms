@@ -54,6 +54,29 @@ if (($_GET['action'] ?? '') === 'check') {
         }
     }
 
+    // 全局限制（所有用户）
+    if ($result['can_generate']) {
+        $config = require __DIR__ . '/../config.php';
+        $features = $config['features'] ?? [];
+        $globalDailyMax = intval($features['global_daily_max'] ?? 0);
+        $globalTotalMax = intval($features['global_total_max'] ?? 0);
+
+        if ($globalDailyMax > 0) {
+            $cnt = $pdo->query("SELECT COUNT(*) FROM gen_images WHERE DATE(created_at) = CURDATE()")->fetchColumn();
+            if ($cnt >= $globalDailyMax) {
+                $result['can_generate'] = false;
+                $result['reason'] = '全站今日生图已达上限（' . $globalDailyMax . ' 张），请明天再试';
+            }
+        }
+        if ($globalTotalMax > 0 && $result['can_generate']) {
+            $cnt = $pdo->query("SELECT COUNT(*) FROM gen_images")->fetchColumn();
+            if ($cnt >= $globalTotalMax) {
+                $result['can_generate'] = false;
+                $result['reason'] = '全站总生图已达上限（' . $globalTotalMax . ' 张）';
+            }
+        }
+    }
+
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($result, JSON_UNESCAPED_UNICODE);
     exit;

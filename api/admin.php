@@ -186,6 +186,57 @@ if ($action === 'api_logs') {
     ok(['list' => $stmt->fetchAll(), 'total' => intval($total), 'page' => $page, 'pages' => ceil($total / $limit)]);
 }
 
+// ========== 用户详情 ==========
+if ($action === 'user_detail') {
+    $uid = intval($_GET['uid'] ?? 0);
+    $u = $pdo->prepare('SELECT id, username, password, role, created_at FROM users WHERE id = ?');
+    $u->execute([$uid]);
+    $userInfo = $u->fetch();
+    if (!$userInfo) err('用户不存在', 404);
+
+    $lastIP = $pdo->prepare('SELECT ip FROM login_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 1');
+    $lastIP->execute([$uid]);
+
+    $todayLogins = $pdo->prepare("SELECT COUNT(*) FROM login_logs WHERE user_id = ? AND DATE(created_at) = CURDATE()");
+    $todayLogins->execute([$uid]);
+
+    $totalLogins = $pdo->prepare('SELECT COUNT(*) FROM login_logs WHERE user_id = ?');
+    $totalLogins->execute([$uid]);
+
+    ok([
+        'username'        => $userInfo['username'],
+        'password_hash'   => $userInfo['password'],
+        'role'            => $userInfo['role'],
+        'created_at'      => $userInfo['created_at'],
+        'last_ip'         => $lastIP->fetchColumn() ?: '暂无',
+        'today_logins'    => intval($todayLogins->fetchColumn()),
+        'total_logins'    => intval($totalLogins->fetchColumn()),
+    ]);
+}
+
+// ========== 功能开关 ==========
+if ($action === 'features') {
+    $configFile = __DIR__ . '/../config.php';
+    $config = require $configFile;
+
+    if ($method === 'GET') {
+        ok($config['features'] ?? []);
+    }
+    if ($method === 'POST') {
+        $key = $input['key'] ?? '';
+        $val = $input['value'] ?? false;
+        // 布尔值保持 bool，字符串保持 string
+        if ($val === true || $val === false || $val === 'true' || $val === 'false') {
+            $val = ($val === true || $val === 'true');
+        }
+        if (!isset($config['features'])) $config['features'] = [];
+        $config['features'][$key] = $val;
+        $export = var_export($config, true);
+        file_put_contents($configFile, "<?php\nreturn {$export};\n");
+        ok();
+    }
+}
+
 // ========== 统计仪表盘 ==========
 if ($action === 'stats') {
     // 每日生成量（最近30天）

@@ -27,6 +27,22 @@ if ($action === 'register') {
     if (strlen($username) < 2 || strlen($username) > 50) jsonOut(['error' => '用户名 2-50 位'], 400);
     if (strlen($password) < 4) jsonOut(['error' => '密码至少 4 位'], 400);
 
+    // IP 黑名单
+    $config = require __DIR__ . '/../config.php';
+    $features = $config['features'] ?? [];
+    $bannedIPs = array_map('trim', explode(',', $features['banned_ips_list'] ?? ''));
+    $clientIP  = $_SERVER['REMOTE_ADDR'] ?? '';
+    if (!empty($bannedIPs[0]) && in_array($clientIP, $bannedIPs)) {
+        jsonOut(['error' => '当前网络环境不支持注册'], 403);
+    }
+
+    // 每日注册上限
+    $dailyMax = intval($features['daily_reg_max'] ?? 0);
+    if ($dailyMax > 0) {
+        $cnt = $pdo->query("SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()")->fetchColumn();
+        if ($cnt >= $dailyMax) jsonOut(['error' => '今日注册名额已满，请明天再试'], 403);
+    }
+
     $stmt = $pdo->prepare('SELECT id FROM users WHERE username = ?');
     $stmt->execute([$username]);
     if ($stmt->fetch()) jsonOut(['error' => '用户名已存在'], 409);
@@ -55,6 +71,22 @@ if ($action === 'login') {
     }
 
     $_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'role' => $user['role']];
+
+    // 记录登录日志（优先获取公网 IP）
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    try {
+        $ch = curl_init('https://api.ipify.org');
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2, CURLOPT_ENCODING => '']);
+        $pubIP = trim(curl_exec($ch) ?: '');
+        curl_close($ch);
+        if (filter_var($pubIP, FILTER_VALIDATE_IP)) $ip = $pubIP . ' / ' . $ip;
+    } catch (Exception $e) {}
+
+    try {
+        $pdo->prepare('INSERT INTO login_logs (user_id, ip) VALUES (?, ?)')
+            ->execute([$user['id'], $ip]);
+    } catch (Exception $e) {}
+
     jsonOut($_SESSION['user']);
 }
 

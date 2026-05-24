@@ -86,10 +86,16 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
     .inline-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
 
-    .msg { padding: 8px 14px; border-radius: 8px; font-size: 12px; margin-bottom: 12px; display: none; }
+    .msg {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
+      padding: 16px 32px; border-radius: 14px; font-size: 15px; font-weight: 500;
+      z-index: 9999; display: none; text-align: center;
+      animation: msgIn 0.25s ease;
+    }
     .msg.show { display: block; }
-    .msg.ok { background: rgba(22,163,74,0.08); color: var(--success); }
-    .msg.err { background: rgba(220,38,38,0.08); color: var(--danger); }
+    .msg.ok { background: #1a1a1a; color: #fff; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+    .msg.err { background: var(--danger); color: #fff; box-shadow: 0 8px 32px rgba(220,38,38,0.3); }
+    @keyframes msgIn { from { opacity: 0; transform: translate(-50%,-50%) scale(0.9); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
 
     .config-display { font-size: 14px; padding: 12px; background: rgba(0,0,0,0.02); border-radius: 8px; word-break: break-all; }
     .config-display code { font-size: 13px; }
@@ -142,6 +148,8 @@ $isAdmin = $user && $user['role'] === 'admin';
         <button class="active" data-tab="images">图片记录</button>
         <button data-tab="users">用户管理</button>
         <button data-tab="stats">用量统计</button>
+        <button data-tab="backup">数据备份</button>
+        <button data-tab="toggles">开关</button>
         <button data-tab="apilog">API 日志</button>
         <button data-tab="logs">操作记录</button>
         <button data-tab="config">API 配置</button>
@@ -182,6 +190,35 @@ $isAdmin = $user && $user['role'] === 'admin';
           <table style="width:100%"><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>耗时</th><th>状态码</th><th>结果</th></tr></thead>
             <tbody id="apilog-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
         </div>
+      </div>
+
+      <div class="card tab-content" id="tab-backup" style="display:none">
+        <h2>数据备份</h2>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid #1a1a1a">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><div style="font-weight:600;font-size:14px">全部备份</div><div style="font-size:11px;color:var(--text-tertiary)">包含图片记录、用户、日志、配置等所有数据</div></div>
+              <a class="btn" href="api/backup.php?action=full" target="_blank" style="text-decoration:none;font-size:13px;padding:8px 18px">导出全部</a>
+            </div>
+          </div>
+          <div id="single-backups" style="display:flex;flex-direction:column;gap:8px">加载中...</div>
+          <div style="display:flex;gap:10px;margin-top:8px">
+            <div style="flex:1;background:#fff;border-radius:10px;padding:14px;border:1px solid var(--card-border)">
+              <div style="font-weight:600;font-size:13px;margin-bottom:6px">导入数据</div>
+              <input type="file" id="import-file" accept=".json" style="font-size:12px;margin-bottom:6px">
+              <button class="btn" style="font-size:12px;padding:6px 14px" onclick="importData()">执行导入</button>
+            </div>
+            <div style="flex:1;background:#fff;border-radius:10px;padding:14px;border:1px solid #fecaca">
+              <div style="font-weight:600;font-size:13px;color:var(--danger);margin-bottom:6px">删除所有数据</div>
+              <button class="btn-danger" style="padding:6px 14px;font-size:12px" onclick="deleteAllData()">全部删除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card tab-content" id="tab-toggles" style="display:none">
+        <h2>前台功能开关</h2>
+        <div id="toggles-container" style="display:flex;flex-direction:column;gap:8px">加载中...</div>
       </div>
 
       <div class="card tab-content" id="tab-stats" style="display:none">
@@ -306,6 +343,8 @@ $isAdmin = $user && $user['role'] === 'admin';
         if (btn.dataset.tab === 'logs') loadAllLogs();
         if (btn.dataset.tab === 'stats') loadStats();
         if (btn.dataset.tab === 'apilog') loadApiLogs();
+        if (btn.dataset.tab === 'backup') loadBackups();
+        if (btn.dataset.tab === 'toggles') loadToggles();
         if (btn.dataset.tab === 'config') loadConfig();
       });
     });
@@ -321,7 +360,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       } else {
         tbody.innerHTML = data.list.map(r => `
           <tr>
-            <td>${r.id}</td><td>${esc(r.username)}</td>
+            <td>${r.id}</td><td style="cursor:pointer" onclick="showUserDetail(${r.user_id})">${esc(r.username)}</td>
             <td style="font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;color:#3b82f6" onclick="previewImage('${esc(r.filename)}','${esc(r.username)}')">${esc(r.filename)}</td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.prompt||'')}</td>
             <td style="font-size:12px">${esc(r.model||'')}</td>
@@ -584,6 +623,94 @@ $isAdmin = $user && $user['role'] === 'admin';
       } else if (pagerEl) pagerEl.remove();
     }
 
+    async function deleteAllData() {
+      const a = prompt('确定删除所有数据？输入 确认删除 后点确定');
+      if (a !== '确认删除') { showMsg('已取消', 'err'); return; }
+      const b = prompt('再次确认：输入 DELETE');
+      if (b !== 'DELETE') { showMsg('已取消', 'err'); return; }
+      const res = await fetch('api/backup.php?action=delete_all', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'YES_DELETE_ALL' })
+      });
+      if (res.ok) { showMsg('已删除所有数据，admin 账号已重置为 admin/admin123', 'ok'); }
+      else showMsg('删除失败', 'err');
+    }
+
+    async function importData() {
+      const file = document.getElementById('import-file').files[0];
+      if (!file) { showMsg('请先选择 JSON 文件', 'err'); return; }
+      const fd = new FormData(); fd.append('file', file);
+      const res = await fetch('api/backup.php?action=import', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (data.ok) { showMsg(`导入完成，${data.imported} 条`, 'ok'); }
+      else showMsg(data.error || '导入失败', 'err');
+    }
+
+    async function loadBackups() {
+      const res = await fetch('api/backup.php?action=tables');
+      const tables = await res.json();
+      const container = document.getElementById('single-backups');
+      container.innerHTML = Object.entries(tables).map(([t, label]) => `
+        <div style="background:#fff;border-radius:10px;padding:10px 14px;border:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between">
+          <span style="font-size:13px;font-weight:500">${label}</span>
+          <a class="btn-ghost" style="font-size:11px;text-decoration:none" href="api/backup.php?action=single&t=${t}" target="_blank">导出</a>
+        </div>`).join('');
+    }
+
+    // ====== 功能开关 ======
+    const toggleDefs = {
+      show_folder_card:  { label: '保存位置卡片', desc: '前台右侧「图片存储」卡片' },
+      show_presets:      { label: '快捷工具',     desc: '前台快捷场景 & 提示词库' },
+      disable_register:  { label: '禁止注册',     desc: '开启后新用户无法注册', hasMsg: true, msgKey: 'register_block_msg', msgDefault: '暂时停止注册' },
+      banned_ips:        { label: 'IP 黑名单',    desc: '禁止这些IP注册（逗号分隔）', hasInput: true, inputKey: 'banned_ips_list', inputPlaceholder: '192.168.1.1, 10.0.0.5', isTextarea: true },
+      daily_reg_limit:   { label: '每日注册上限', desc: '每天最多注册数（0=不限）', hasInput: true, inputKey: 'daily_reg_max', inputPlaceholder: '0', isNumber: true },
+      global_daily_limit:{ label: '全局每日生图上限', desc: '所有用户每天合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_daily_max', inputPlaceholder: '0', isNumber: true },
+      global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
+    };
+    async function loadToggles() {
+      const res = await fetch('api/admin.php?action=features');
+      const features = await res.json();
+      const container = document.getElementById('toggles-container');
+      container.innerHTML = Object.entries(toggleDefs).map(([key, def]) => {
+        const on = features[key] !== false;
+        const msgVal = def.hasMsg ? (features[def.msgKey] || def.msgDefault) : '';
+        return `<div style="background:#fff;border-radius:8px;padding:12px 16px;border:1px solid var(--card-border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${def.hasMsg ? '10px' : '0'}">
+            <div><div style="font-weight:500;font-size:14px">${def.label}</div><div style="font-size:11px;color:var(--text-tertiary)">${def.desc}</div></div>
+            <button id="tg-${key}" style="width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;transition:background .2s;background:${on?'#1a1a1a':'#ddd'};position:relative;flex-shrink:0" onclick="toggleFeature('${key}',${!on})">
+              <span style="position:absolute;top:3px;left:${on?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+            </button>
+          </div>
+          ${def.hasMsg ? `<div style="display:flex;gap:6px"><input id="msg-${def.msgKey}" value="${esc(msgVal)}" placeholder="${def.msgDefault}" style="flex:1;font-size:12px"><button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveFeatureMsg('${def.msgKey}')">保存</button></div>` : ''}
+          ${def.hasInput ? `<div style="display:flex;gap:6px">${def.isTextarea ? `<textarea id="inp-${def.inputKey}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px;min-height:40px;resize:vertical">${esc(features[def.inputKey]||'')}</textarea>` : `<input id="inp-${def.inputKey}" value="${esc(features[def.inputKey]||'')}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px" type="${def.isNumber?'number':'text'}" min="0">`}<button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveInputFeature('${def.inputKey}')">保存</button></div>` : ''}
+        </div>`;
+      }).join('');
+    }
+    async function toggleFeature(key, val) {
+      await fetch('api/admin.php?action=features', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: val })
+      });
+      loadToggles();
+    }
+    async function saveFeatureMsg(key) {
+      const val = document.getElementById('msg-'+key)?.value?.trim() || '';
+      await fetch('api/admin.php?action=features', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: val || 'no_msg' })
+      });
+      showMsg('已保存', 'ok'); loadToggles();
+    }
+    async function saveInputFeature(key) {
+      const el = document.getElementById('inp-'+key);
+      const val = el?.value?.trim() || '';
+      await fetch('api/admin.php?action=features', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value: val || '0' })
+      });
+      showMsg('已保存', 'ok'); loadToggles();
+    }
+
     // ====== 统计仪表盘 ======
     let statsCharts = {};
     async function loadStats() {
@@ -650,6 +777,30 @@ $isAdmin = $user && $user['role'] === 'admin';
         },
         options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
       });
+    }
+
+    async function showUserDetail(uid) {
+      const res = await fetch(`api/admin.php?action=user_detail&uid=${uid}`);
+      const u = await res.json();
+      if (u.error) { showMsg(u.error, 'err'); return; }
+      const overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.innerHTML = `<div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%">
+        <h2 style="margin-bottom:16px">用户详情</h2>
+        <table style="width:100%">
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">用户名</td><td>${esc(u.username)}</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">密码(哈希)</td><td style="font-size:11px;word-break:break-all">${esc(u.password_hash)}</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">角色</td><td>${u.role==='admin'?'管理员':'用户'}</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">最后登录IP</td><td style="font-family:monospace">${esc(u.last_ip)}</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">今日登录</td><td>${u.today_logins} 次</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">总登录</td><td>${u.total_logins} 次</td></tr>
+          <tr><td style="color:var(--text-tertiary);padding:4px 0">注册时间</td><td style="font-size:12px">${u.created_at||''}</td></tr>
+        </table>
+        <div style="text-align:right;margin-top:16px"><button class="btn" id="detail-close">关闭</button></div>
+      </div>`;
+      document.body.appendChild(overlay);
+      overlay.querySelector('#detail-close').onclick = () => overlay.remove();
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     }
 
     async function showRanking() {

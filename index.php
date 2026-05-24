@@ -1008,6 +1008,7 @@
         <div class="dialog-title" id="auth-title">登录</div>
         <input class="dialog-input" id="auth-username" type="text" placeholder="用户名">
         <input class="dialog-input" id="auth-password" type="password" placeholder="密码">
+        <input class="dialog-input" id="auth-password2" type="password" placeholder="确认密码" style="display:none">
         <div class="dialog-actions">
           <button class="dialog-btn dialog-btn-cancel" id="auth-cancel">取消</button>
           <button class="dialog-btn dialog-btn-confirm" id="auth-submit">登录</button>
@@ -5166,6 +5167,7 @@ ${chinesePrompt}
       const authCancel = document.getElementById('auth-cancel');
       const authUser   = document.getElementById('auth-username');
       const authPass   = document.getElementById('auth-password');
+      const authPass2  = document.getElementById('auth-password2');
       const loginBtn   = document.getElementById('login-btn');
       const logoutBtn  = document.getElementById('logout-btn');
       const adminLink  = document.getElementById('admin-link');
@@ -5196,7 +5198,8 @@ ${chinesePrompt}
           ? '<a href="#" style="color:var(--text-secondary)">没有账号？去注册</a>'
           : '<a href="#" style="color:var(--text-secondary)">已有账号？去登录</a>';
         authDialog.classList.add('active');
-        authUser.value = ''; authPass.value = '';
+        authUser.value = ''; authPass.value = ''; authPass2.value = '';
+        authPass2.style.display = mode === 'register' ? '' : 'none';
         setTimeout(() => authUser.focus(), 100);
       }
 
@@ -5206,6 +5209,7 @@ ${chinesePrompt}
         const username = authUser.value.trim();
         const password = authPass.value.trim();
         if (!username || !password) { flashStatus('请填写用户名和密码', 'danger'); return; }
+        if (authMode === 'register' && password !== authPass2.value) { flashStatus('两次密码不一致', 'danger'); return; }
 
         authSubmit.disabled = true; authSubmit.textContent = '处理中...';
         try {
@@ -5215,7 +5219,7 @@ ${chinesePrompt}
           });
           const data = await res.json();
           if (!res.ok || data.error) {
-            flashStatus(data.error || `请求失败 (${res.status})`, 'danger');
+            alert(data.error || `请求失败 (${res.status})`);
             return;
           }
           currentUser = data;
@@ -5248,12 +5252,17 @@ ${chinesePrompt}
         } catch (_) {}
       }
 
+      let features = {};
       loginBtn.addEventListener('click', () => openAuthDialog('login'));
       logoutBtn.addEventListener('click', doLogout);
       authCancel.addEventListener('click', closeAuthDialog);
       authSubmit.addEventListener('click', doAuth);
       authSwitch.addEventListener('click', (e) => {
         e.preventDefault();
+        if (authMode === 'login' && features.disable_register) {
+          alert(features.register_block_msg || '暂时停止注册');
+          return;
+        }
         openAuthDialog(authMode === 'login' ? 'register' : 'login');
       });
       authDialog.addEventListener('click', (e) => { if (e.target === authDialog) closeAuthDialog(); });
@@ -5301,6 +5310,27 @@ ${chinesePrompt}
           batchDownloadBtn.style.display = any ? '' : 'none';
         }
       });
+
+      // ====== 读取功能开关 ======
+      async function loadFeatureToggles() {
+        try {
+          const res = await fetch('api/features.php');
+          features = await res.json();
+          // 字符串值需转回布尔
+          if (features.show_folder_card === 'false') features.show_folder_card = false;
+          if (features.show_presets === 'false') features.show_presets = false;
+          if (features.disable_register === 'false') features.disable_register = false;
+          if (!features.show_folder_card) {
+            const el = document.querySelector('.card-folder');
+            if (el) el.style.display = 'none';
+          }
+          if (!features.show_presets) {
+            const el = document.querySelector('.card-presets');
+            if (el) el.style.display = 'none';
+          }
+        } catch (_) {}
+      }
+      loadFeatureToggles();
 
       checkSession();
 
