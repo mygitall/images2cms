@@ -34,6 +34,7 @@
       --border-focus: rgba(0,0,0,0.2);
       --overlay: rgba(0,0,0,0.04);
       --modal-bg: #fff;
+      --btn-text: #fff;
       --radius-sm: 10px;
       --radius: 18px;
       --radius-lg: 24px;
@@ -63,6 +64,7 @@
       --border-focus: rgba(255,255,255,0.2);
       --overlay: rgba(255,255,255,0.04);
       --modal-bg: #111;
+      --btn-text: #000;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -124,34 +126,36 @@
 
     /* ====== Hero ====== */
     .hero {
-      margin-bottom: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
     }
     .hero h1 {
-      font-size: clamp(32px, 5vw, 52px);
+      font-size: clamp(24px, 4vw, 36px);
       font-weight: 700;
       letter-spacing: -0.03em;
       line-height: 1.1;
       color: var(--text);
     }
     .hero .sub {
-      font-size: 16px;
+      font-size: 14px;
       color: var(--text-secondary);
-      margin-top: 8px;
+      margin-top: 2px;
       font-weight: 400;
     }
     .hero .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      margin-top: 16px;
-      padding: 6px 14px;
+      gap: 4px;
+      margin-top: 6px;
+      padding: 4px 10px;
       border-radius: 100px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       color: var(--success);
       background: rgba(52,211,153,0.08);
       border: 1px solid rgba(52,211,153,0.15);
     }
+    .hero-left { flex: 1; min-width: 0; }
 
     /* ====== Bento Grid ====== */
     .bento {
@@ -175,17 +179,21 @@
     }
 
     /* Card sizes */
-    .card-model       { grid-column: span 2; }
-    .card-text-model  { grid-column: span 2; }
-    .card-protocol    { grid-column: span 2; }
+    .card-config      { grid-column: span 3; }
     .card-folder      { grid-column: span 3; }
     .card-settings    { grid-column: span 3; }
-    .card-prompt      { grid-column: span 6; }
+    .card-prompt      { grid-column: span 3; }
     .card-upload      { grid-column: span 3; }
     .card-generate    { grid-column: span 3; }
     .card-presets     { grid-column: span 6; margin-top: 4px; }
     .card-results     { grid-column: span 6; margin-top: 4px; }
     .card-history     { grid-column: span 6; margin-top: 4px; }
+
+    .config-inline {
+      display: flex; gap: 12px; align-items: flex-end;
+    }
+    .config-inline > div { flex: 1; min-width: 0; }
+    .config-inline label { white-space: nowrap; }
 
     /* ====== Typography ====== */
     .glass-card h2 {
@@ -262,7 +270,7 @@
       font-family: var(--font);
       cursor: pointer;
       background: var(--text);
-      color: #000;
+      color: var(--btn-text);
       letter-spacing: -0.01em;
       transition: opacity 0.15s ease;
     }
@@ -301,7 +309,7 @@
 
     .btn-mini.primary {
       background: var(--text);
-      color: #000;
+      color: var(--btn-text);
       border: none;
     }
     .btn-mini.primary:hover { opacity: 0.8; }
@@ -412,7 +420,7 @@
       text-decoration: none; cursor: pointer; font-family: var(--font);
     }
     .card .mini-btn:hover { border-color: var(--border-focus); color: var(--text); }
-    .card .mini-btn.primary { background: var(--text); color: #000; border: none; }
+    .card .mini-btn.primary { background: var(--text); color: var(--btn-text); border: none; }
     .card img.zoomable {
       cursor: zoom-in; transition: transform 0.15s ease;
     }
@@ -455,7 +463,7 @@
     .continue-panel .panel-actions { display: flex; gap: 8px; }
     .continue-panel .gen-btn {
       flex: 1; padding: 8px 12px; border: none; border-radius: 8px;
-      background: var(--text); color: #000; font-weight: 600; font-size: 13px;
+      background: var(--text); color: var(--btn-text); font-weight: 600; font-size: 13px;
       cursor: pointer; font-family: var(--font);
     }
     .continue-panel .gen-btn:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -635,7 +643,7 @@
       cursor: pointer; font-family: var(--font); transition: opacity 0.15s; border: none;
     }
     .dialog-btn-cancel { background: var(--accent-dim); color: var(--text); }
-    .dialog-btn-confirm { background: var(--text); color: #000; }
+    .dialog-btn-confirm { background: var(--text); color: var(--btn-text); }
     .dialog-btn-confirm:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* ====== Lightbox ====== */
@@ -749,7 +757,7 @@
       cursor: pointer; font-family: var(--font); transition: opacity 0.15s; border: none;
     }
     .angle-modal-btn-cancel { background: var(--accent-dim); color: var(--text); }
-    .angle-modal-btn-confirm { background: var(--text); color: #000; }
+    .angle-modal-btn-confirm { background: var(--text); color: var(--btn-text); }
 
     /* ====== Storyboard ====== */
     .storyboard-overlay {
@@ -787,7 +795,7 @@
       padding: 10px 20px; border-radius: 100px; font-size: 14px; font-weight: 600;
       cursor: pointer; font-family: var(--font); transition: opacity 0.15s; border: none;
     }
-    .storyboard-btn-primary { background: var(--text); color: #000; }
+    .storyboard-btn-primary { background: var(--text); color: var(--btn-text); }
     .storyboard-btn-secondary { background: var(--accent-dim); color: var(--text); }
     .storyboard-preview-section { margin-bottom: 20px; }
     .storyboard-section-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
@@ -847,7 +855,7 @@
       cursor: pointer; font-family: var(--font); transition: opacity 0.15s; border: none;
     }
     .prompt-compare-btn-secondary { background: var(--accent-dim); color: var(--text); }
-    .prompt-compare-btn-primary { background: var(--text); color: #000; }
+    .prompt-compare-btn-primary { background: var(--text); color: var(--btn-text); }
     .prompt-compare-btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
 
     /* ====== Misc ====== */
@@ -863,13 +871,13 @@
     /* ====== Responsive ====== */
     @media (max-width: 900px) {
       .bento { grid-template-columns: 1fr; gap: 10px; }
-      .card-model, .card-text-model, .card-protocol,
-      .card-folder, .card-settings, .card-prompt,
+      .card-config, .card-folder, .card-settings, .card-prompt,
       .card-upload, .card-generate, .card-presets,
       .card-results, .card-history { grid-column: span 1; }
+      .config-inline { flex-direction: column; gap: 8px; }
       .app { padding: 24px 16px 60px; }
-      .hero { margin-bottom: 32px; }
-      .hero h1 { font-size: 28px; }
+      .hero { margin-bottom: 24px; }
+      .hero h1 { font-size: 24px; }
       .results { grid-template-columns: 1fr; }
       .history-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
       .row { grid-template-columns: 1fr; }
@@ -880,11 +888,9 @@
 
     @media (min-width: 901px) and (max-width: 1100px) {
       .bento { grid-template-columns: repeat(4, 1fr); }
-      .card-model { grid-column: span 2; }
-      .card-text-model { grid-column: span 2; }
-      .card-protocol { grid-column: span 2; }
+      .card-config { grid-column: span 2; }
       .card-folder { grid-column: span 2; }
-      .card-prompt { grid-column: span 4; }
+      .card-prompt { grid-column: span 2; }
       .card-upload { grid-column: span 2; }
       .card-generate { grid-column: span 2; }
       .card-presets { grid-column: span 4; }
@@ -898,43 +904,39 @@
   <div class="app">
     <!-- Hero -->
     <header class="hero">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;">
-        <div>
-          <h1>Image Studio</h1>
-          <p class="sub">文生图 / 图生图 · 参考图最多 4 张</p>
-          <span class="badge">&#9702; API 已在 config.php 后端配置</span>
-        </div>
-        <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
+      <div class="hero-left">
+        <h1>Image Studio</h1>
+        <p class="sub">文生图 / 图生图 · 参考图最多 4 张</p>
+        <span class="badge">&#9702; API 已在后端配置</span>
       </div>
+      <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
     </header>
 
     <!-- Bento Grid -->
     <div class="bento">
-      <!-- 生图模型 -->
-      <div class="glass-card card-model">
-        <label for="image-model">生图模型</label>
-        <select id="image-model">
-          <option value="gemini-3-pro-image-preview" selected>gemini-3-pro-image-preview</option>
-        </select>
-        <button class="btn-mini" id="fetch-models-btn" style="margin-top:8px;">拉取模型列表</button>
-      </div>
-
-      <!-- 文本模型 -->
-      <div class="glass-card card-text-model">
-        <label for="text-model">文本优化模型</label>
-        <select id="text-model">
-          <option value="gemini-3-flash-preview" selected>gemini-3-flash-preview</option>
-        </select>
-      </div>
-
-      <!-- API 协议 -->
-      <div class="glass-card card-protocol">
-        <label for="api-protocol">API 协议</label>
-        <select id="api-protocol">
-          <option value="gemini">Gemini 原生</option>
-          <option value="openai-chat" selected>OpenAI Chat</option>
-          <option value="openai-images">OpenAI Images</option>
-        </select>
+      <!-- 模型 & 协议 -->
+      <div class="glass-card card-config">
+        <label>模型 &amp; 协议</label>
+        <div class="config-inline">
+          <div>
+            <select id="image-model">
+              <option value="gemini-3-pro-image-preview" selected>gemini-3-pro-image-preview</option>
+            </select>
+          </div>
+          <div>
+            <select id="text-model">
+              <option value="gemini-3-flash-preview" selected>gemini-3-flash-preview</option>
+            </select>
+          </div>
+          <div>
+            <select id="api-protocol">
+              <option value="gemini">Gemini 原生</option>
+              <option value="openai-chat" selected>OpenAI Chat</option>
+              <option value="openai-images">OpenAI Images</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-mini" id="fetch-models-btn" style="margin-top:10px;">拉取模型列表</button>
       </div>
 
       <!-- 保存位置 -->
