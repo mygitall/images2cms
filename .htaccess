@@ -1,4 +1,5 @@
 <IfModule mod_rewrite.c>
 RewriteEngine On
-RewriteRule ^admin$ admin/ [R=301,L]
+# 允许 /images 或 /images/ 都能访问
+RewriteRule ^$ index.php [L]
 </IfModule>

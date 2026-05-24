@@ -12,7 +12,8 @@ if (file_exists(__DIR__ . '/config.php')) {
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <base href="<?php echo rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') . '/'; ?>">
   <title>token link 多图工具</title>
 
   <!-- Three.js 库 -->
@@ -76,7 +77,7 @@ if (file_exists(__DIR__ . '/config.php')) {
       --btn-text: #1a1a1a;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     body {
       font-family: var(--font);
@@ -1044,19 +1045,19 @@ if (file_exists(__DIR__ . '/config.php')) {
       <div class="glass-card card-settings">
         <label for="aspect">图片比例</label>
         <select id="aspect" hidden>
-          <option value="auto">自动</option>
+          <option value="auto" selected>自动</option>
           <option value="1:1">1:1</option>
           <option value="3:4">3:4</option>
           <option value="4:3">4:3</option>
-          <option value="16:9" selected>16:9</option>
+          <option value="16:9">16:9</option>
           <option value="9:16">9:16</option>
         </select>
         <div class="btn-group" id="aspect-btns"></div>
 
         <label for="resolution" style="margin-top:10px;">清晰度</label>
         <select id="resolution" hidden>
-          <option value="1K">1K</option>
-          <option value="2K" selected>2K</option>
+          <option value="1K" selected>1K</option>
+          <option value="2K">2K</option>
           <option value="4K">4K</option>
         </select>
         <div class="btn-group" id="resolution-btns"></div>
@@ -1068,7 +1069,7 @@ if (file_exists(__DIR__ . '/config.php')) {
         </div>
 
         <div class="status" id="status">请先登录后再生成图片</div>
-        <button class="btn" id="run" style="width:100%; margin-top:8px;">发送请求</button>
+        <button class="btn" id="run" style="width:100%; margin-top:8px;">开始生产图片</button>
       </div>
 
       <!-- 结果 & 历史（共享同一位置，互斥显示） -->
@@ -1699,12 +1700,7 @@ if (file_exists(__DIR__ . '/config.php')) {
             console.warn('服务器历史加载失败', e.message);
           }
 
-          // 服务器无数据时降级到本地 IndexedDB
-          if (records.length === 0) {
-            const local = await loadHistory();
-            records = local.filter(r => r.username === currentUser.username);
-            totalFromServer = records.length;
-          }
+          // 服务端无数据 → 保持空（不再降级到本地 IndexedDB，以保证和后台数据一致）
 
           const totalPages = Math.ceil(totalFromServer / HISTORY_PAGE_SIZE) || 1;
           historyPage = Math.min(page, totalPages);

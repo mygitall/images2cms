@@ -12,7 +12,8 @@ $isAdmin = $user && $user['role'] === 'admin';
 <html lang="zh">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <base href="<?php echo rtrim(dirname($_SERVER['SCRIPT_NAME']), '/') . '/'; ?>">
   <title>后台管理 — Image Studio</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
@@ -28,7 +29,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: var(--font); background: var(--bg); color: var(--text);
       min-height: 100vh; -webkit-font-smoothing: antialiased;
