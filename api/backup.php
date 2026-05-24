@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 数据备份 API
  * GET ?action=full      — 导出全部（JSON）
@@ -57,12 +59,10 @@ if ($action === 'delete_all') {
         echo json_encode(['error' => '需要确认参数'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-    $pdo->exec('TRUNCATE TABLE gen_images');
-    $pdo->exec('TRUNCATE TABLE login_logs');
-    $pdo->exec('TRUNCATE TABLE api_logs');
-    $pdo->exec('TRUNCATE TABLE users');
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+    $pdo->exec('DELETE FROM gen_images');
+    $pdo->exec('DELETE FROM login_logs');
+    $pdo->exec('DELETE FROM api_logs');
+    $pdo->exec('DELETE FROM users');
     // 重建默认管理员
     $pdo->prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)')
         ->execute(['admin', password_hash('admin123', PASSWORD_BCRYPT), 'admin']);
@@ -87,7 +87,6 @@ if ($action === 'import') {
     }
 
     $imported = 0;
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
 
     // 支持完整备份或单表备份
     $data = isset($json['gen_images']) ? $json : ['gen_images' => $json];
@@ -116,7 +115,6 @@ if ($action === 'import') {
         file_put_contents(__DIR__ . '/../config.php', "<?php\nreturn {$export};\n");
     }
 
-    $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => true, 'imported' => $imported], JSON_UNESCAPED_UNICODE);
     exit;

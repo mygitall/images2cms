@@ -3,8 +3,11 @@
  * 认证 API：注册 / 登录 / 登出 / 当前用户
  */
 
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
+
 require_once __DIR__ . '/../db.php';
-session_start();
+if (session_status() === PHP_SESSION_NONE) session_start();
 
 $action = $_GET['action'] ?? '';
 

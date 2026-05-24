@@ -14,6 +14,7 @@ return array (
       'base_url' => 'https://api.tokln.com',
     ),
   ),
+  'installed' => true,
   'save_dir' => '/Applications/MAMP/htdocs/images/uploads',
   'features' => 
   array (

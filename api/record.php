@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 记录生成图片 + 检查限制
  * GET  ?action=check  → 检查当前用户是否达到限制

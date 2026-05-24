@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 获取当前用户的历史生成记录
  * GET /api/history.php

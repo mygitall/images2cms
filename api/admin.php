@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 管理后台 API（需要 admin 权限）
  * GET  /api/admin.php?action=users       — 用户列表

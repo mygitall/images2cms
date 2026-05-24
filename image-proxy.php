@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * CORS 图片代理 —— 前端跨域无法加载 api.tokln.com 的图片时，通过本代理获取
  * GET: image-proxy.php?url=https://api.tokln.com/...

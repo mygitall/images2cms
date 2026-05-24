@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 批量下载图片为 ZIP
  * POST { files: ["a.png","b.png"], user: "username" }

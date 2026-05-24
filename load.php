@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 从服务器加载已保存的图片（支持用户子目录）
  * GET: load.php?file=xxx.png&user=username

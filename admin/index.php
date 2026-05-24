@@ -1,4 +1,10 @@
 <?php
+if (file_exists(__DIR__ . '/../config.php')) {
+    $__cfg = require __DIR__ . '/../config.php';
+    if (empty($__cfg['installed'])) { header('Location: ../install.php'); exit; }
+} else {
+    header('Location: ../install.php'); exit;
+}
 session_start();
 $user = $_SESSION['user'] ?? null;
 $isAdmin = $user && $user['role'] === 'admin';
@@ -139,7 +145,7 @@ $isAdmin = $user && $user['role'] === 'admin';
         <h1>Image Studio 后台</h1>
         <div class="user-info">
           <span class="user-tag" id="admin-username"></span>
-          <a href="index.php">回前台</a>
+          <a href="../index.php">回前台</a>
           <button class="btn-ghost" onclick="doLogout()">退出</button>
         </div>
       </div>
@@ -198,7 +204,7 @@ $isAdmin = $user && $user['role'] === 'admin';
           <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid #1a1a1a">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div><div style="font-weight:600;font-size:14px">全部备份</div><div style="font-size:11px;color:var(--text-tertiary)">包含图片记录、用户、日志、配置等所有数据</div></div>
-              <a class="btn" href="api/backup.php?action=full" target="_blank" style="text-decoration:none;font-size:13px;padding:8px 18px">导出全部</a>
+              <a class="btn" href="../api/backup.php?action=full" target="_blank" style="text-decoration:none;font-size:13px;padding:8px 18px">导出全部</a>
             </div>
           </div>
           <div id="single-backups" style="display:flex;flex-direction:column;gap:8px">加载中...</div>
@@ -291,13 +297,13 @@ $isAdmin = $user && $user['role'] === 'admin';
       const submitBtn = document.getElementById('login-submit');
       submitBtn.disabled = true; submitBtn.textContent = '登录中...';
       try {
-        const res = await fetch('api/auth.php?action=login', {
+        const res = await fetch('../api/auth.php?action=login', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (data.error) { loginError.textContent = data.error; loginError.style.display = ''; return; }
-        if (data.role !== 'admin') { loginError.textContent = '需要管理员权限'; loginError.style.display = ''; return; }
+        if (data.role !== 'admin') { loginError.textContent = '需要管理员权限（当前角色：' + (data.role || '未知') + '）'; loginError.style.display = ''; return; }
         currentUserId = data.id;
         document.getElementById('admin-username').textContent = data.username + ' · 管理员';
         loginBox.style.display = 'none';
@@ -309,7 +315,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     async function doLogout() {
-      await fetch('api/auth.php?action=logout', { method: 'POST' });
+      await fetch('../api/auth.php?action=logout', { method: 'POST' });
       location.reload();
     }
 
@@ -318,7 +324,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       if (e.key === 'Enter') doLogin();
     });
     document.getElementById('login-switch').addEventListener('click', () => {
-      location.href = 'index.php';
+      location.href = '../index.php';
     });
 
     let imagesPage = 1;
@@ -352,7 +358,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     // ====== 图片列表 ======
     async function loadImages(page = 1) {
       imagesPage = page;
-      const res = await fetch(`api/admin.php?action=images&page=${page}`);
+      const res = await fetch(`../api/admin.php?action=images&page=${page}`);
       const data = await res.json();
       const tbody = document.getElementById('images-tbody');
       if (!data.list || !data.list.length) {
@@ -377,13 +383,13 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     async function deleteImage(id) {
       if (!confirm('确定删除？也会删除服务器上的图片文件')) return;
-      await fetch(`api/admin.php?action=images&id=${id}`, { method: 'DELETE' });
+      await fetch(`../api/admin.php?action=images&id=${id}`, { method: 'DELETE' });
       showMsg('已删除', 'ok'); loadImages(imagesPage);
     }
 
     // ====== 用户列表 ======
     async function loadUsers() {
-      const res = await fetch('api/admin.php?action=users');
+      const res = await fetch('../api/admin.php?action=users');
       const list = await res.json();
       const tbody = document.getElementById('users-tbody');
       if (!list.length) {
@@ -391,7 +397,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       } else {
         // 并行加载每个用户的最新操作
         const logs = await Promise.all(list.map(u =>
-          fetch(`api/admin.php?action=user_logs&uid=${u.id}&latest=1`).then(r => r.json()).catch(() => [])
+          fetch(`../api/admin.php?action=user_logs&uid=${u.id}&latest=1`).then(r => r.json()).catch(() => [])
         ));
         tbody.innerHTML = list.map((u, i) => {
           const latest = logs[i]?.[0];
@@ -414,7 +420,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     async function viewUserLogs(uid, username) {
-      const res = await fetch(`api/admin.php?action=user_logs&uid=${uid}`);
+      const res = await fetch(`../api/admin.php?action=user_logs&uid=${uid}`);
       const list = await res.json();
       const html = list.length ? list.map(r => `
         <tr>
@@ -441,7 +447,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const password = document.getElementById('new-password').value.trim();
       const role = document.getElementById('new-role').value;
       if (!username || !password) return showMsg('请填写用户名和密码', 'err');
-      const res = await fetch('api/admin.php?action=users', {
+      const res = await fetch('../api/admin.php?action=users', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password, role })
       });
@@ -454,13 +460,13 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     async function deleteUser(id) {
       if (!confirm('确定删除该用户？会同时删除其所有图片记录')) return;
-      await fetch(`api/admin.php?action=users&id=${id}`, { method: 'DELETE' });
+      await fetch(`../api/admin.php?action=users&id=${id}`, { method: 'DELETE' });
       showMsg('已删除', 'ok'); loadUsers();
     }
 
     // ====== API 配置（多 Profile）=====
     async function loadConfig() {
-      const res = await fetch('api/admin.php?action=config');
+      const res = await fetch('../api/admin.php?action=config');
       const data = await res.json();
       const container = document.getElementById('profiles-container');
       const active = data.active || 'default';
@@ -488,14 +494,14 @@ $isAdmin = $user && $user['role'] === 'admin';
       const api_key = document.getElementById('key-'+name)?.value?.trim() || '';
       const base_url = document.getElementById('url-'+name)?.value?.trim() || '';
       if (!api_key && !base_url) return showMsg('至少填写一项', 'err');
-      await fetch('api/admin.php?action=config', {
+      await fetch('../api/admin.php?action=config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'save', name, api_key, base_url })
       });
       showMsg('已保存', 'ok'); loadConfig();
     }
     async function switchProfile(name) {
-      await fetch('api/admin.php?action=config', {
+      await fetch('../api/admin.php?action=config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'switch', name })
       });
@@ -504,7 +510,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     async function addProfile() {
       const name = prompt('新配置名称（如：备用Key、国内线路）：');
       if (!name) return;
-      await fetch('api/admin.php?action=config', {
+      await fetch('../api/admin.php?action=config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'add', name })
       });
@@ -512,7 +518,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
     async function deleteProfile(name) {
       if (!confirm('确定删除「'+name+'」？')) return;
-      await fetch('api/admin.php?action=config', {
+      await fetch('../api/admin.php?action=config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action:'delete', name })
       });
@@ -528,7 +534,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       document.getElementById('limit-total').value = '';
       document.getElementById('limit-dialog').style.display = 'flex';
       try {
-        const res = await fetch(`api/admin.php?action=limits&uid=${uid}`);
+        const res = await fetch(`../api/admin.php?action=limits&uid=${uid}`);
         const data = await res.json();
         if (data) {
           if (data.daily_limit !== null) document.getElementById('limit-daily').value = data.daily_limit;
@@ -541,7 +547,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     document.getElementById('limit-save').addEventListener('click', async () => {
       const daily = document.getElementById('limit-daily').value.trim();
       const total = document.getElementById('limit-total').value.trim();
-      await fetch('api/admin.php?action=limits', {
+      await fetch('../api/admin.php?action=limits', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: limitUserId, daily_limit: daily || null, total_limit: total || null })
       });
@@ -553,7 +559,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     let logsPage = 1;
     async function loadAllLogs(page = 1) {
       logsPage = page;
-      const res = await fetch(`api/admin.php?action=all_logs&page=${page}`);
+      const res = await fetch(`../api/admin.php?action=all_logs&page=${page}`);
       const data = await res.json();
       const tbody = document.getElementById('logs-tbody');
       if (!data.list || !data.list.length) {
@@ -590,7 +596,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     let apiLogPage = 1;
     async function loadApiLogs(page = 1) {
       apiLogPage = page;
-      const res = await fetch(`api/admin.php?action=api_logs&page=${page}`);
+      const res = await fetch(`../api/admin.php?action=api_logs&page=${page}`);
       const data = await res.json();
       const tbody = document.getElementById('apilog-tbody');
       if (!data.list || !data.list.length) {
@@ -628,7 +634,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       if (a !== '确认删除') { showMsg('已取消', 'err'); return; }
       const b = prompt('再次确认：输入 DELETE');
       if (b !== 'DELETE') { showMsg('已取消', 'err'); return; }
-      const res = await fetch('api/backup.php?action=delete_all', {
+      const res = await fetch('../api/backup.php?action=delete_all', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: 'YES_DELETE_ALL' })
       });
@@ -640,20 +646,20 @@ $isAdmin = $user && $user['role'] === 'admin';
       const file = document.getElementById('import-file').files[0];
       if (!file) { showMsg('请先选择 JSON 文件', 'err'); return; }
       const fd = new FormData(); fd.append('file', file);
-      const res = await fetch('api/backup.php?action=import', { method: 'POST', body: fd });
+      const res = await fetch('../api/backup.php?action=import', { method: 'POST', body: fd });
       const data = await res.json();
       if (data.ok) { showMsg(`导入完成，${data.imported} 条`, 'ok'); }
       else showMsg(data.error || '导入失败', 'err');
     }
 
     async function loadBackups() {
-      const res = await fetch('api/backup.php?action=tables');
+      const res = await fetch('../api/backup.php?action=tables');
       const tables = await res.json();
       const container = document.getElementById('single-backups');
       container.innerHTML = Object.entries(tables).map(([t, label]) => `
         <div style="background:#fff;border-radius:10px;padding:10px 14px;border:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:13px;font-weight:500">${label}</span>
-          <a class="btn-ghost" style="font-size:11px;text-decoration:none" href="api/backup.php?action=single&t=${t}" target="_blank">导出</a>
+          <a class="btn-ghost" style="font-size:11px;text-decoration:none" href="../api/backup.php?action=single&t=${t}" target="_blank">导出</a>
         </div>`).join('');
     }
 
@@ -668,7 +674,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
     };
     async function loadToggles() {
-      const res = await fetch('api/admin.php?action=features');
+      const res = await fetch('../api/admin.php?action=features');
       const features = await res.json();
       const container = document.getElementById('toggles-container');
       container.innerHTML = Object.entries(toggleDefs).map(([key, def]) => {
@@ -687,7 +693,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       }).join('');
     }
     async function toggleFeature(key, val) {
-      await fetch('api/admin.php?action=features', {
+      await fetch('../api/admin.php?action=features', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: val })
       });
@@ -695,7 +701,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
     async function saveFeatureMsg(key) {
       const val = document.getElementById('msg-'+key)?.value?.trim() || '';
-      await fetch('api/admin.php?action=features', {
+      await fetch('../api/admin.php?action=features', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: val || 'no_msg' })
       });
@@ -704,7 +710,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     async function saveInputFeature(key) {
       const el = document.getElementById('inp-'+key);
       const val = el?.value?.trim() || '';
-      await fetch('api/admin.php?action=features', {
+      await fetch('../api/admin.php?action=features', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: val || '0' })
       });
@@ -714,7 +720,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     // ====== 统计仪表盘 ======
     let statsCharts = {};
     async function loadStats() {
-      const res = await fetch('api/admin.php?action=stats');
+      const res = await fetch('../api/admin.php?action=stats');
       const data = await res.json();
       console.log('[stats]', data);
 
@@ -780,7 +786,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     async function showUserDetail(uid) {
-      const res = await fetch(`api/admin.php?action=user_detail&uid=${uid}`);
+      const res = await fetch(`../api/admin.php?action=user_detail&uid=${uid}`);
       const u = await res.json();
       if (u.error) { showMsg(u.error, 'err'); return; }
       const overlay = document.createElement('div');
@@ -808,7 +814,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       if (box.style.display !== 'none') { box.style.display = 'none'; return; }
       box.innerHTML = '加载中...'; box.style.display = '';
       try {
-        const res = await fetch('api/admin.php?action=ranking');
+        const res = await fetch('../api/admin.php?action=ranking');
         const list = await res.json();
         const max = list[0]?.cnt || 1;
         box.innerHTML = '<div style="font-weight:600;margin-bottom:8px">用户生成排名</div>' +
@@ -829,7 +835,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     function previewImage(filename, username) {
-      const url = `load.php?file=${encodeURIComponent(filename)}&user=${encodeURIComponent(username)}`;
+      const url = `../load.php?file=${encodeURIComponent(filename)}&user=${encodeURIComponent(username)}`;
       document.getElementById('preview-img').src = url;
       document.getElementById('preview-overlay').style.display = 'flex';
     }

@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 保存图片到服务器（按用户名分目录）
  * POST: { url: "https://..." } 或 { image: "data:image/png;base64,..." } + filename + username

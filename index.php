@@ -1,4 +1,13 @@
-﻿<?php session_start(); ?><!doctype html>
+﻿<?php
+session_start();
+// 未安装 → 跳安装向导
+if (file_exists(__DIR__ . '/config.php')) {
+    $__cfg = require __DIR__ . '/config.php';
+    if (empty($__cfg['installed'])) { header('Location: install.php'); exit; }
+} else {
+    header('Location: install.php'); exit;
+}
+?><!doctype html>
 <html lang="zh">
 
 <head>
@@ -44,27 +53,27 @@
 
     /* Dark theme */
     [data-theme="dark"] {
-      --bg: #000;
-      --glow-1: rgba(255,255,255,0.025);
-      --glow-2: rgba(255,255,255,0.015);
-      --card-bg: rgba(255,255,255,0.02);
-      --card-border: rgba(255,255,255,0.06);
-      --card-hover: rgba(255,255,255,0.04);
-      --text: #fafafa;
-      --text-secondary: #888;
-      --text-tertiary: #555;
-      --accent: #fafafa;
-      --accent-dim: rgba(255,255,255,0.1);
-      --danger: #ef4444;
-      --success: #34d399;
-      --input-bg: rgba(255,255,255,0.03);
-      --input-focus: rgba(255,255,255,0.1);
-      --border-hover: rgba(255,255,255,0.12);
-      --border-strong: rgba(255,255,255,0.15);
-      --border-focus: rgba(255,255,255,0.2);
-      --overlay: rgba(255,255,255,0.04);
-      --modal-bg: #111;
-      --btn-text: #000;
+      --bg: #1a1a1a;
+      --glow-1: rgba(255,255,255,0.015);
+      --glow-2: rgba(255,255,255,0.01);
+      --card-bg: rgba(255,255,255,0.03);
+      --card-border: rgba(255,255,255,0.08);
+      --card-hover: rgba(255,255,255,0.06);
+      --text: #eee;
+      --text-secondary: #999;
+      --text-tertiary: #777;
+      --accent: #eee;
+      --accent-dim: rgba(255,255,255,0.12);
+      --danger: #f87171;
+      --success: #4ade80;
+      --input-bg: rgba(255,255,255,0.05);
+      --input-focus: rgba(255,255,255,0.15);
+      --border-hover: rgba(255,255,255,0.15);
+      --border-strong: rgba(255,255,255,0.18);
+      --border-focus: rgba(255,255,255,0.22);
+      --overlay: rgba(255,255,255,0.06);
+      --modal-bg: #222;
+      --btn-text: #1a1a1a;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -997,7 +1006,7 @@
         <span class="hero-user" id="hero-user" style="display:none;font-size:13px;color:var(--text-secondary)"></span>
         <button class="btn-ghost" id="login-btn" style="font-size:12px;">登录</button>
         <button class="btn-ghost" id="logout-btn" style="display:none;font-size:12px;">退出</button>
-        <a class="btn-ghost" id="admin-link" href="admin.php" target="_blank" style="display:none;font-size:12px;text-decoration:none;">后台</a>
+        <a class="btn-ghost" id="admin-link" href="admin/" target="_blank" style="display:none;font-size:12px;text-decoration:none;">后台</a>
         <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
       </div>
     </header>

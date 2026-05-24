@@ -1,0 +1,4 @@
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^admin$ admin/ [R=301,L]
+</IfModule>

@@ -1,4 +1,6 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 0);
 /**
  * 通用 API 代理
  *
@@ -15,7 +17,13 @@ $active  = $config['active'] ?? 'default';
 $profile = $config['profiles'][$active] ?? $config['profiles']['default'] ?? [];
 
 $apiKey  = trim($profile['api_key'] ?? '');
-$baseUrl = rtrim($profile['base_url'] ?? 'https://api.tokln.com', '/');
+$baseUrl = rtrim($profile['base_url'] ?? '', '/');
+if (empty($baseUrl)) {
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['error' => '未配置 Base URL，请在后台设置'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $targetPath = $_GET['path'] ?? '';
 
 // ---- 参数校验 ----
