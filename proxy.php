@@ -157,5 +157,87 @@ if (preg_match('/Content-Type:\s*([^\r\n]+)/i', $responseHeaders, $matches)) {
     header('Content-Type: ' . trim($matches[1]));
 }
 
+// ---- 自动保存生成的图片（关闭浏览器也不丢失）----
+$isImageEndpoint = (stripos($targetPath, 'generateContent') !== false || stripos($targetPath, 'images/generations') !== false || stripos($targetPath, 'chat/completions') !== false);
+if ($uid && $isImageEndpoint && $httpCode >= 200 && $httpCode < 400 && !empty($responseBody)) {
+    $saved = false;
+    $saveFilename = '';
+
+    try {
+        require_once __DIR__ . '/save.php'; // 复用 save.php 的路径逻辑
+        $config = require __DIR__ . '/config.php';
+        $saveDir = rtrim($config['save_dir'], '/');
+        $username = $_SESSION['user']['username'] ?? '';
+
+        // 尝试解析响应中的图片
+        $data = @json_decode($responseBody, true);
+
+        if ($data) {
+            // OpenAI images 格式: { data: [{ url, b64_json }] }
+            $imgUrl = $data['data'][0]['url'] ?? '';
+            $imgB64 = $data['data'][0]['b64_json'] ?? '';
+            if (!$imgUrl) {
+                // OpenAI chat 格式: choices[0].message.content (可能包含 image_url)
+                $content = $data['choices'][0]['message']['content'] ?? '';
+                if (is_array($content)) {
+                    foreach ($content as $c) {
+                        if ($c['type'] === 'image_url' && !empty($c['image_url']['url'])) {
+                            $imgUrl = $c['image_url']['url']; break;
+                        }
+                    }
+                }
+            }
+
+            // Gemini 格式: candidates[0].content.parts (inline_data)
+            $parts = $data['candidates'][0]['content']['parts'] ?? [];
+            foreach ($parts as $p) {
+                if (!empty($p['inline_data']['data'])) {
+                    $imgB64 = $p['inline_data']['data']; break;
+                }
+            }
+
+            $ext = 'png';
+            if (strpos(($imgUrl ?: $imgB64), '.jpg') !== false || strpos(($imgUrl ?: $imgB64), 'jpeg') !== false) $ext = 'jpg';
+
+            $saveFilename = 'auto-' . date('YmdHis') . '-' . substr(md5(uniqid()), 0, 6) . '.' . $ext;
+
+            // 保存到 user 子目录
+            if ($username && preg_match('/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}\-]+$/u', $username)) {
+                $userDir = $saveDir . '/' . $username;
+                if (!is_dir($userDir)) mkdir($userDir, 0755, true);
+
+                if ($imgUrl) {
+                    $ch = curl_init($imgUrl);
+                    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 60, CURLOPT_FOLLOWLOCATION => true, CURLOPT_ENCODING => '']);
+                    $binary = curl_exec($ch);
+                    curl_close($ch);
+                    if ($binary) { file_put_contents($userDir . '/' . $saveFilename, $binary); $saved = true; }
+                } elseif ($imgB64) {
+                    $binary = base64_decode($imgB64);
+                    if ($binary) { file_put_contents($userDir . '/' . $saveFilename, $binary); $saved = true; }
+                }
+            }
+
+            // 写入 MySQL 记录
+            if ($saved && isset($pdo)) {
+                $prompt = '';
+                if (!empty($data['choices'][0]['message']['content'])) {
+                    $mc = $data['choices'][0]['message']['content'];
+                    if (is_array($mc)) {
+                        foreach ($mc as $ci) { if ($ci['type'] === 'text') { $prompt = $ci['text']; break; } }
+                    } elseif (is_string($mc)) { $prompt = $mc; }
+                }
+                $parts2 = $data['candidates'][0]['content']['parts'] ?? $data['contents'][0]['parts'] ?? [];
+                foreach ($parts2 as $p2) { if (!empty($p2['text'])) { $prompt = $p2['text']; break; } }
+
+                $stmt2 = $pdo->prepare('INSERT INTO gen_images (user_id, filename, prompt, model) VALUES (?, ?, ?, ?)');
+                $stmt2->execute([$uid, $saveFilename, $prompt ?: '', '']);
+            }
+        }
+    } catch (\Throwable $e) {
+        // 保存失败不影响主流程
+    }
+}
+
 // ---- 输出响应体 ----
 echo $responseBody;

@@ -100,6 +100,34 @@ if ($action === 'logout') {
     jsonOut(['ok' => true]);
 }
 
+// ========== 修改密码 ==========
+if ($action === 'changepw') {
+    $user = $_SESSION['user'] ?? null;
+    if (!$user) jsonOut(['error' => '未登录'], 401);
+    $oldPw = $input['old_password'] ?? '';
+    $newPw = $input['new_password'] ?? '';
+    if (strlen($newPw) < 4) jsonOut(['error' => '新密码至少 4 位'], 400);
+
+    $stmt = $pdo->prepare('SELECT username, password FROM users WHERE id = ?');
+    $stmt->execute([$user['id']]);
+    $row = $stmt->fetch();
+    if (!$row) jsonOut(['error' => '用户不存在'], 404);
+
+    if (!password_verify($oldPw, $row['password'])) {
+        // 检查是否需要重新哈希（兼容旧版加密）
+        if ($oldPw === $row['password'] || md5($oldPw) === $row['password']) {
+            // 旧明文/MD5 密码，直接更新为 bcrypt
+            $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')
+                ->execute([password_hash($newPw, PASSWORD_BCRYPT), $user['id']]);
+            jsonOut(['ok' => true]);
+        }
+        jsonOut(['error' => '原密码错误（用户：' . $row['username'] . '）'], 403);
+    }
+    $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')
+        ->execute([password_hash($newPw, PASSWORD_BCRYPT), $user['id']]);
+    jsonOut(['ok' => true]);
+}
+
 // ========== 获取当前用户 ==========
 if ($action === 'me') {
     jsonOut($_SESSION['user'] ?? null);

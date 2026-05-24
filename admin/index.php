@@ -18,7 +18,7 @@ $isAdmin = $user && $user['role'] === 'admin';
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg: #f5f5f7;
+      --bg: #f5f5f5;
       --card-bg: rgba(255,255,255,0.7);
       --card-border: rgba(0,0,0,0.06);
       --text: #1a1a1a;
@@ -26,7 +26,23 @@ $isAdmin = $user && $user['role'] === 'admin';
       --text-tertiary: #999;
       --danger: #dc2626;
       --success: #16a34a;
+      --popup-bg: #fff;
+      --popup-border: rgba(0,0,0,0.08);
+      --accent-bg: rgba(0,0,0,0.03);
       --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+    }
+    [data-theme="dark"] {
+      --bg: #1a1a1a;
+      --card-bg: rgba(255,255,255,0.04);
+      --card-border: rgba(255,255,255,0.08);
+      --text: #eee;
+      --text-secondary: #999;
+      --text-tertiary: #777;
+      --danger: #f87171;
+      --success: #4ade80;
+      --popup-bg: #2a2a2a;
+      --popup-border: rgba(255,255,255,0.1);
+      --accent-bg: rgba(255,255,255,0.04);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -147,8 +163,19 @@ $isAdmin = $user && $user['role'] === 'admin';
         <div class="user-info">
           <span class="user-tag" id="admin-username"></span>
           <a href="../index.php">回前台</a>
+          <button class="btn-ghost" style="font-size:16px;padding:4px 10px" id="admin-theme-toggle" title="切换主题">&#9788;</button>
           <button class="btn-ghost" onclick="doLogout()">退出</button>
         </div>
+      </div>
+
+      <!-- 生图 -->
+      <div class="card" id="admin-gen-card" style="margin-bottom:16px">
+        <h2>快速生图 <span style="font-weight:400;font-size:12px;color:var(--text-tertiary)">关闭浏览器也不中断，图片自动保存</span></h2>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <textarea id="admin-prompt" placeholder="输入提示词..." style="flex:1;min-width:200px;resize:vertical;min-height:60px;padding:10px 14px;border:1px solid var(--card-border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;color:var(--text);background:var(--popup-bg)"></textarea>
+          <button class="btn" id="admin-gen-btn" style="flex-shrink:0">开始生图</button>
+        </div>
+        <div id="admin-gen-status" style="font-size:12px;color:var(--text-tertiary);margin-top:8px"></div>
       </div>
 
       <div class="tabs">
@@ -185,7 +212,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
       <div class="card tab-content" id="tab-logs" style="display:none">
         <h2>操作记录</h2>
-        <div id="logs-content" style="background:#fff;border-radius:16px;padding:24px;max-height:70vh;overflow-y:auto;border:1px solid var(--card-border)">
+        <div id="logs-content" style="background:var(--popup-bg);border-radius:16px;padding:24px;max-height:70vh;overflow-y:auto;border:1px solid var(--card-border)">
           <table style="width:100%"><thead><tr><th>操作</th><th>用户</th><th>详情</th><th>模型</th><th>时间</th><th>状态</th></tr></thead>
             <tbody id="logs-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
         </div>
@@ -193,7 +220,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
       <div class="card tab-content" id="tab-apilog" style="display:none">
         <h2>API 调用日志</h2>
-        <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);max-height:65vh;overflow-y:auto">
+        <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);max-height:65vh;overflow-y:auto">
           <table style="width:100%"><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>耗时</th><th>状态码</th><th>结果</th></tr></thead>
             <tbody id="apilog-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
         </div>
@@ -202,7 +229,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       <div class="card tab-content" id="tab-backup" style="display:none">
         <h2>数据备份</h2>
         <div style="display:flex;flex-direction:column;gap:10px">
-          <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid #1a1a1a">
+          <div style="background:var(--popup-bg);border-radius:10px;padding:14px 16px;border:2px solid #1a1a1a">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div><div style="font-weight:600;font-size:14px">全部备份</div><div style="font-size:11px;color:var(--text-tertiary)">包含图片记录、用户、日志、配置等所有数据</div></div>
               <a class="btn" href="../api/backup.php?action=full" target="_blank" style="text-decoration:none;font-size:13px;padding:8px 18px">导出全部</a>
@@ -210,12 +237,12 @@ $isAdmin = $user && $user['role'] === 'admin';
           </div>
           <div id="single-backups" style="display:flex;flex-direction:column;gap:8px">加载中...</div>
           <div style="display:flex;gap:10px;margin-top:8px">
-            <div style="flex:1;background:#fff;border-radius:10px;padding:14px;border:1px solid var(--card-border)">
+            <div style="flex:1;background:var(--popup-bg);border-radius:10px;padding:14px;border:1px solid var(--card-border)">
               <div style="font-weight:600;font-size:13px;margin-bottom:6px">导入数据</div>
               <input type="file" id="import-file" accept=".json" style="font-size:12px;margin-bottom:6px">
               <button class="btn" style="font-size:12px;padding:6px 14px" onclick="importData()">执行导入</button>
             </div>
-            <div style="flex:1;background:#fff;border-radius:10px;padding:14px;border:1px solid #fecaca">
+            <div style="flex:1;background:var(--popup-bg);border-radius:10px;padding:14px;border:1px solid #fecaca">
               <div style="font-weight:600;font-size:13px;color:var(--danger);margin-bottom:6px">删除所有数据</div>
               <button class="btn-danger" style="padding:6px 14px;font-size:12px" onclick="deleteAllData()">全部删除</button>
             </div>
@@ -232,15 +259,15 @@ $isAdmin = $user && $user['role'] === 'admin';
         <h2>用量统计仪表盘</h2>
         <div id="stats-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
-          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+          <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
             <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">每日生成量（近30天）</h3>
             <canvas id="chart-daily" height="120"></canvas>
           </div>
-          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+          <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
             <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">用户活跃度（近30天）</h3>
             <canvas id="chart-users" height="120"></canvas>
           </div>
-          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+          <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
             <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">模型使用分布</h3>
             <canvas id="chart-models" height="120"></canvas>
           </div>
@@ -269,8 +296,13 @@ $isAdmin = $user && $user['role'] === 'admin';
     </div>
 
     <!-- 图片预览弹窗 -->
-    <div id="preview-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out" onclick="closePreview()">
-      <img id="preview-img" src="" style="max-width:95vw;max-height:95vh;object-fit:contain;border-radius:4px">
+    <div id="preview-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;cursor:zoom-out;flex-direction:column" onclick="closePreview()">
+      <span id="preview-counter" style="color:#fff;font-size:13px;margin-bottom:8px;z-index:1"></span>
+      <div style="display:flex;align-items:center;gap:16px">
+        <button style="background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer;flex-shrink:0" onclick="previewPrev(event)">&#8249;</button>
+        <img id="preview-img" src="" style="max-width:80vw;max-height:85vh;object-fit:contain;border-radius:4px;cursor:default" onclick="event.stopPropagation()">
+        <button style="background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer;flex-shrink:0" onclick="previewNext(event)">&#8250;</button>
+      </div>
       <button style="position:absolute;top:20px;right:24px;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:24px;width:44px;height:44px;border-radius:50%;cursor:pointer" onclick="closePreview()">&#10005;</button>
     </div>
   </div>
@@ -331,10 +363,42 @@ $isAdmin = $user && $user['role'] === 'admin';
     let imagesPage = 1;
 
     // 已登录 → 直接显示面板
+    // 主题切换
+    const adminThemeToggle = document.getElementById('admin-theme-toggle');
+    const savedTheme = localStorage.getItem('app-theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    adminThemeToggle.addEventListener('click', () => {
+      const cur = document.documentElement.getAttribute('data-theme');
+      const next = cur === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('app-theme', next);
+    });
+
     <?php if ($isAdmin): ?>
     document.getElementById('login-box').style.display = 'none';
     adminPanel.classList.add('active');
     document.getElementById('admin-username').textContent = '<?= htmlspecialchars($user['username']) ?> · 管理员';
+
+    // 后台生图
+    const adminGenBtn = document.getElementById('admin-gen-btn');
+    const adminPrompt = document.getElementById('admin-prompt');
+    const adminGenStatus = document.getElementById('admin-gen-status');
+    adminGenBtn.addEventListener('click', async () => {
+      const prompt = adminPrompt.value.trim();
+      if (!prompt) { adminGenStatus.textContent = '请输入提示词'; return; }
+      adminGenBtn.disabled = true; adminGenStatus.textContent = '生成中...';
+      const start = Date.now();
+      try {
+        const payload = { model: 'gpt-image-2', messages: [{ role: 'user', content: prompt }] };
+        const endpoint = '../proxy.php?path=' + encodeURIComponent('/v1/chat/completions');
+        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!res.ok) { adminGenStatus.innerHTML = '<span style="color:var(--danger)">失败: ' + await res.text() + '</span>'; return; }
+        adminGenStatus.innerHTML = '<span style="color:var(--success)">完成</span> (' + ((Date.now()-start)/1000).toFixed(1) + 's) — 图片已自动保存';
+        setTimeout(() => loadImages(), 1500);
+      } catch (e) { adminGenStatus.innerHTML = '<span style="color:var(--danger)">错误: ' + e.message + '</span>'; }
+      finally { adminGenBtn.disabled = false; }
+    });
+
     loadImages();
     <?php endif; ?>
 
@@ -361,14 +425,15 @@ $isAdmin = $user && $user['role'] === 'admin';
       imagesPage = page;
       const res = await fetch(`../api/admin.php?action=images&page=${page}`);
       const data = await res.json();
+      allImages = data.list || [];
       const tbody = document.getElementById('images-tbody');
       if (!data.list || !data.list.length) {
         tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-tertiary)">暂无记录</td></tr>';
       } else {
-        tbody.innerHTML = data.list.map(r => `
+        tbody.innerHTML = data.list.map((r, i) => `
           <tr>
             <td>${r.id}</td><td style="cursor:pointer" onclick="showUserDetail(${r.user_id})">${esc(r.username)}</td>
-            <td style="font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;color:#3b82f6" onclick="previewImage('${esc(r.filename)}','${esc(r.username)}')">${esc(r.filename)}</td>
+            <td style="font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;color:#3b82f6" onclick="previewImage('${esc(r.filename)}','${esc(r.username)}',${i})">${esc(r.filename)}</td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.prompt||'')}</td>
             <td style="font-size:12px">${esc(r.model||'')}</td>
             <td style="font-size:12px">${r.created_at||''}</td>
@@ -433,7 +498,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
       overlay.innerHTML = `
-        <div style="background:#fff;border-radius:16px;padding:24px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto">
+        <div style="background:var(--popup-bg);border-radius:16px;padding:24px;max-width:700px;width:90%;max-height:80vh;overflow-y:auto">
           <h2 style="margin-bottom:16px">${esc(username)} 的操作记录（共${list.length}条）</h2>
           <table><thead><tr><th>文件名</th><th>提示词</th><th>时间</th><th>状态</th></tr></thead><tbody>${html}</tbody></table>
           <div style="text-align:right;margin-top:16px"><button class="btn" id="close-logs">关闭</button></div>
@@ -473,7 +538,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const active = data.active || 'default';
       const profiles = data.profiles || {};
       container.innerHTML = Object.entries(profiles).map(([name, p]) => `
-        <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid ${name === active ? '#1a1a1a' : 'var(--card-border)'}">
+        <div style="background:var(--popup-bg);border-radius:10px;padding:14px 16px;border:2px solid ${name === active ? '#1a1a1a' : 'var(--card-border)'}">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span style="font-weight:600;font-size:14px">${esc(name)} ${name === active ? '<span style="font-size:10px;color:#fff;background:#1a1a1a;padding:2px 8px;border-radius:100px;margin-left:6px">当前</span>' : ''}</span>
             <div>
@@ -658,7 +723,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const tables = await res.json();
       const container = document.getElementById('single-backups');
       container.innerHTML = Object.entries(tables).map(([t, label]) => `
-        <div style="background:#fff;border-radius:10px;padding:10px 14px;border:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between">
+        <div style="background:var(--popup-bg);border-radius:10px;padding:10px 14px;border:1px solid var(--card-border);display:flex;align-items:center;justify-content:space-between">
           <span style="font-size:13px;font-weight:500">${label}</span>
           <a class="btn-ghost" style="font-size:11px;text-decoration:none" href="../api/backup.php?action=single&t=${t}" target="_blank">导出</a>
         </div>`).join('');
@@ -681,11 +746,11 @@ $isAdmin = $user && $user['role'] === 'admin';
       container.innerHTML = Object.entries(toggleDefs).map(([key, def]) => {
         const on = features[key] !== false;
         const msgVal = def.hasMsg ? (features[def.msgKey] || def.msgDefault) : '';
-        return `<div style="background:#fff;border-radius:8px;padding:12px 16px;border:1px solid var(--card-border)">
+        return `<div style="background:var(--popup-bg);border-radius:8px;padding:12px 16px;border:1px solid var(--card-border)">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:${def.hasMsg ? '10px' : '0'}">
             <div><div style="font-weight:500;font-size:14px">${def.label}</div><div style="font-size:11px;color:var(--text-tertiary)">${def.desc}</div></div>
             <button id="tg-${key}" style="width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;transition:background .2s;background:${on?'#1a1a1a':'#ddd'};position:relative;flex-shrink:0" onclick="toggleFeature('${key}',${!on})">
-              <span style="position:absolute;top:3px;left:${on?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
+              <span style="position:absolute;top:3px;left:${on?'27px':'3px'};width:22px;height:22px;border-radius:50%;background:var(--popup-bg);transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></span>
             </button>
           </div>
           ${def.hasMsg ? `<div style="display:flex;gap:6px"><input id="msg-${def.msgKey}" value="${esc(msgVal)}" placeholder="${def.msgDefault}" style="flex:1;font-size:12px"><button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveFeatureMsg('${def.msgKey}')">保存</button></div>` : ''}
@@ -735,7 +800,7 @@ $isAdmin = $user && $user['role'] === 'admin';
         { label: '今日生成', value: ov.today_images || 0 },
         { label: '总用户数', value: ov.total_users || 0 },
         { label: '已删图片', value: ov.deleted_images || 0 },
-      ].map(d => `<div style="flex:1;min-width:80px;background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);text-align:center">
+      ].map(d => `<div style="flex:1;min-width:80px;background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);text-align:center">
         <div style="font-size:22px;font-weight:700">${d.value}</div>
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
       </div>`).join('');
@@ -792,7 +857,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       if (u.error) { showMsg(u.error, 'err'); return; }
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
-      overlay.innerHTML = `<div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%">
+      overlay.innerHTML = `<div style="background:var(--popup-bg);border-radius:16px;padding:28px;max-width:420px;width:90%">
         <h2 style="margin-bottom:16px">用户详情</h2>
         <table style="width:100%">
           <tr><td style="color:var(--text-tertiary);padding:4px 0">用户名</td><td>${esc(u.username)}</td></tr>
@@ -835,11 +900,21 @@ $isAdmin = $user && $user['role'] === 'admin';
       const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
     }
 
-    function previewImage(filename, username) {
-      const url = `../load.php?file=${encodeURIComponent(filename)}&user=${encodeURIComponent(username)}`;
+    let allImages = [];
+    let previewIdx = -1;
+
+    function previewImage(filename, username, idx) {
+      if (idx !== undefined) previewIdx = idx; else previewIdx = allImages.findIndex(r => r.filename === filename);
+      if (previewIdx < 0) previewIdx = 0;
+      const r = allImages[previewIdx];
+      if (!r) return;
+      const url = `../load.php?file=${encodeURIComponent(r.filename)}&user=${encodeURIComponent(r.username)}`;
       document.getElementById('preview-img').src = url;
+      document.getElementById('preview-counter').textContent = `${previewIdx + 1} / ${allImages.length}`;
       document.getElementById('preview-overlay').style.display = 'flex';
     }
+    function previewPrev(e) { e.stopPropagation(); if (previewIdx > 0) previewImage(null, null, previewIdx - 1); }
+    function previewNext(e) { e.stopPropagation(); if (previewIdx < allImages.length - 1) previewImage(null, null, previewIdx + 1); }
     function closePreview() {
       document.getElementById('preview-overlay').style.display = 'none';
       document.getElementById('preview-img').src = '';

@@ -598,6 +598,7 @@ if (file_exists(__DIR__ . '/config.php')) {
       cursor: pointer; padding: 2px 4px; font-size: 11px; opacity: 0.6;
     }
     .history-card .delete-btn:hover { opacity: 1; }
+    .history-card .regen-btn { background: rgba(59,130,246,0.15); border:none; color:#3b82f6; cursor:pointer; padding:2px 6px; font-size:10px; border-radius:4px; }
     .history-card .hd-btn, .history-card .add-btn, .history-card .save-prompt-btn {
       background: var(--accent-dim); border: none; color: var(--text-secondary);
       cursor: pointer; padding: 2px 6px; font-size: 10px; border-radius: 4px;
@@ -1005,12 +1006,26 @@ if (file_exists(__DIR__ . '/config.php')) {
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="hero-user" id="hero-user" style="display:none;font-size:13px;color:var(--text-secondary)"></span>
+        <button class="btn-ghost" id="changepw-btn" style="display:none;font-size:11px;">改密</button>
         <button class="btn-ghost" id="login-btn" style="font-size:12px;">登录</button>
         <button class="btn-ghost" id="logout-btn" style="display:none;font-size:12px;">退出</button>
         <a class="btn-ghost" id="admin-link" href="admin/" target="_blank" style="display:none;font-size:12px;text-decoration:none;">后台</a>
         <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
       </div>
     </header>
+
+    <!-- 修改密码弹窗 -->
+    <div class="dialog-overlay" id="changepw-dialog">
+      <div class="dialog-content">
+        <div class="dialog-title">修改密码</div>
+        <input class="dialog-input" id="changepw-old" type="password" placeholder="原密码">
+        <input class="dialog-input" id="changepw-new" type="password" placeholder="新密码（至少4位）">
+        <div class="dialog-actions">
+          <button class="dialog-btn dialog-btn-cancel" id="changepw-cancel">取消</button>
+          <button class="dialog-btn dialog-btn-confirm" id="changepw-submit">确认修改</button>
+        </div>
+      </div>
+    </div>
 
     <!-- 登录注册弹窗 -->
     <div class="dialog-overlay" id="auth-dialog">
@@ -1733,6 +1748,7 @@ if (file_exists(__DIR__ . '/config.php')) {
                 </div>
                 <div class="meta">
                   <span>${formatDate(record.timestamp)}</span>
+                  <button class="regen-btn" title="重新生成">🔄</button>
                   ${hasFilename ? '<button class="add-btn" title="添加到参考图">➕</button>' : ''}
                   ${hasFilename ? '<button class="hd-btn" title="从文件夹加载高清图">🔍</button>' : ''}
                   <button class="save-prompt-btn" title="保存提示词到库">💾</button>
@@ -1856,6 +1872,17 @@ if (file_exists(__DIR__ . '/config.php')) {
             }
 
             // 保存提示词到库按钮
+            // 重新生成按钮
+            const regenBtn = card.querySelector('.regen-btn');
+            if (regenBtn && record.prompt) {
+              regenBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                promptInput.value = record.prompt;
+                toggleResults(true);
+                handleRun();
+              });
+            }
+
             const savePromptBtn = card.querySelector('.save-prompt-btn');
             if (savePromptBtn && record.prompt) {
               savePromptBtn.addEventListener('click', async (e) => {
@@ -5184,11 +5211,11 @@ ${chinesePrompt}
       function updateAuthUI() {
         if (currentUser) {
           heroUser.style.display = ''; heroUser.textContent = currentUser.username;
-          loginBtn.style.display = 'none'; logoutBtn.style.display = '';
+          changepwBtn.style.display = ''; loginBtn.style.display = 'none'; logoutBtn.style.display = '';
           if (currentUser.role === 'admin') { adminLink.style.display = ''; }
           if (statusEl.textContent === '请先登录后再生成图片') statusEl.textContent = '待发送...';
         } else {
-          heroUser.style.display = 'none'; loginBtn.style.display = '';
+          heroUser.style.display = 'none'; changepwBtn.style.display = 'none'; loginBtn.style.display = '';
           logoutBtn.style.display = 'none'; adminLink.style.display = 'none';
           statusEl.textContent = '请先登录后再生成图片';
         }
@@ -5336,6 +5363,27 @@ ${chinesePrompt}
         } catch (_) {}
       }
       loadFeatureToggles();
+
+      // ====== 修改密码 ======
+      const changepwBtn = document.getElementById('changepw-btn');
+      const changepwDialog = document.getElementById('changepw-dialog');
+      changepwBtn.addEventListener('click', () => changepwDialog.classList.add('active'));
+      document.getElementById('changepw-cancel').addEventListener('click', () => changepwDialog.classList.remove('active'));
+      document.getElementById('changepw-submit').addEventListener('click', async () => {
+        const oldPw = document.getElementById('changepw-old').value;
+        const newPw = document.getElementById('changepw-new').value;
+        if (!oldPw || !newPw) { flashStatus('请填写原密码和新密码', 'danger'); return; }
+        const res = await fetch('api/auth.php?action=changepw', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ old_password: oldPw, new_password: newPw })
+        });
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        changepwDialog.classList.remove('active');
+        document.getElementById('changepw-old').value = '';
+        document.getElementById('changepw-new').value = '';
+        showToast('密码已修改', 'success');
+      });
 
       checkSession();
 

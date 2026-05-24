@@ -40,8 +40,9 @@ if (empty($found)) {
 
 if (!file_exists($filePath)) {
     http_response_code(404);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => '文件不存在'], JSON_UNESCAPED_UNICODE);
+    header('Content-Type: image/png');
+    // 返回 1x1 透明 PNG，避免前端报错
+    echo base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==');
     exit;
 }
 
