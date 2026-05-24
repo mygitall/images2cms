@@ -101,23 +101,49 @@ if ($action === 'images') {
     }
 }
 
-// ========== 配置管理 ==========
+// ========== 配置管理（多 Profile）==========
 if ($action === 'config') {
     $configFile = __DIR__ . '/../config.php';
 
     if ($method === 'GET') {
         $config = require $configFile;
-        $key = $config['api_key'] ?? '';
-        $masked = $key ? substr($key, 0, 8) . '****' . substr($key, -4) : '(未设置)';
-        ok(['api_key_masked' => $masked, 'base_url' => $config['base_url'] ?? '']);
+        $profiles = [];
+        foreach ($config['profiles'] ?? [] as $name => $p) {
+            $key = $p['api_key'] ?? '';
+            $profiles[$name] = [
+                'name'     => $name,
+                'key_masked' => $key ? substr($key,0,8).'****'.substr($key,-4) : '(未设置)',
+                'base_url' => $p['base_url'] ?? '',
+            ];
+        }
+        ok(['active' => $config['active'] ?? 'default', 'profiles' => $profiles]);
     }
 
     if ($method === 'POST') {
-        $newKey   = trim($input['api_key'] ?? '');
-        $newUrl   = trim($input['base_url'] ?? '');
-        $config   = require $configFile;
-        if ($newKey) $config['api_key'] = $newKey;
-        if ($newUrl) $config['base_url'] = $newUrl;
+        $action2 = $input['action'] ?? 'save'; // save | switch | add | delete
+        $config  = require $configFile;
+
+        if ($action2 === 'add') {
+            $name = trim($input['name'] ?? '');
+            if (!$name) err('名称不能为空');
+            $config['profiles'][$name] = ['api_key' => '', 'base_url' => ''];
+        } elseif ($action2 === 'delete') {
+            $name = $input['name'] ?? '';
+            if ($name === 'default') err('不能删除默认配置');
+            unset($config['profiles'][$name]);
+            if ($config['active'] === $name) $config['active'] = 'default';
+        } elseif ($action2 === 'switch') {
+            $name = $input['name'] ?? 'default';
+            if (!isset($config['profiles'][$name])) err('配置不存在');
+            $config['active'] = $name;
+        } elseif ($action2 === 'save') {
+            $name = $input['name'] ?? 'default';
+            $newKey = trim($input['api_key'] ?? '');
+            $newUrl = trim($input['base_url'] ?? '');
+            if (!isset($config['profiles'][$name])) $config['profiles'][$name] = [];
+            if ($newKey) $config['profiles'][$name]['api_key'] = $newKey;
+            if ($newUrl) $config['profiles'][$name]['base_url'] = $newUrl;
+        }
 
         $export = var_export($config, true);
         file_put_contents($configFile, "<?php\nreturn {$export};\n");

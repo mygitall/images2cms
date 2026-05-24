@@ -204,13 +204,8 @@ $isAdmin = $user && $user['role'] === 'admin';
       </div>
 
       <div class="card tab-content" id="tab-config" style="display:none">
-        <h2>API Key 配置</h2>
-        <div class="config-display" id="config-display">加载中...</div>
-        <div class="inline-form" style="margin-top:16px">
-          <input id="new-api-key" placeholder="新 API Key" style="width:300px">
-          <input id="new-base-url" placeholder="Base URL" style="width:260px">
-          <button class="btn" onclick="updateConfig()">保存配置</button>
-        </div>
+        <h2>API Key 配置 <button class="btn-ghost" style="margin-left:12px;font-size:11px" onclick="addProfile()">+ 添加配置</button></h2>
+        <div id="profiles-container" style="display:flex;flex-direction:column;gap:10px">加载中...</div>
       </div>
     </div>
 
@@ -424,24 +419,65 @@ $isAdmin = $user && $user['role'] === 'admin';
       showMsg('已删除', 'ok'); loadUsers();
     }
 
-    // ====== API 配置 ======
+    // ====== API 配置（多 Profile）=====
     async function loadConfig() {
       const res = await fetch('api/admin.php?action=config');
       const data = await res.json();
-      document.getElementById('config-display').innerHTML =
-        '<div>API Key: <code>'+esc(data.api_key_masked)+'</code></div><div style="margin-top:4px">Base URL: <code>'+esc(data.base_url)+'</code></div>';
+      const container = document.getElementById('profiles-container');
+      const active = data.active || 'default';
+      const profiles = data.profiles || {};
+      container.innerHTML = Object.entries(profiles).map(([name, p]) => `
+        <div style="background:#fff;border-radius:10px;padding:14px 16px;border:2px solid ${name === active ? '#1a1a1a' : 'var(--card-border)'}">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-weight:600;font-size:14px">${esc(name)} ${name === active ? '<span style="font-size:10px;color:#fff;background:#1a1a1a;padding:2px 8px;border-radius:100px;margin-left:6px">当前</span>' : ''}</span>
+            <div>
+              ${name !== active ? '<button class="btn-ghost" style="font-size:10px;padding:3px 10px" onclick="switchProfile(\''+esc(name)+'\')">启用</button>' : ''}
+              ${name !== 'default' ? '<button class="btn-danger" style="font-size:10px;padding:3px 10px;margin-left:4px" onclick="deleteProfile(\''+esc(name)+'\')">删除</button>' : ''}
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-tertiary)">Key: ${esc(p.key_masked)}</div>
+          <div style="font-size:12px;color:var(--text-tertiary)">URL: ${esc(p.base_url)}</div>
+          <div style="margin-top:8px;display:flex;gap:6px">
+            <input id="key-${esc(name)}" placeholder="新 Key" style="flex:1;font-size:11px">
+            <input id="url-${esc(name)}" placeholder="新 URL" style="flex:1;font-size:11px">
+            <button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveProfile('${esc(name)}')">保存</button>
+          </div>
+        </div>`).join('');
     }
 
-    async function updateConfig() {
-      const api_key = document.getElementById('new-api-key').value.trim();
-      const base_url = document.getElementById('new-base-url').value.trim();
+    async function saveProfile(name) {
+      const api_key = document.getElementById('key-'+name)?.value?.trim() || '';
+      const base_url = document.getElementById('url-'+name)?.value?.trim() || '';
       if (!api_key && !base_url) return showMsg('至少填写一项', 'err');
-      const res = await fetch('api/admin.php?action=config', {
+      await fetch('api/admin.php?action=config', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key, base_url })
+        body: JSON.stringify({ action:'save', name, api_key, base_url })
       });
-      if (!res.ok) { showMsg('保存失败', 'err'); return; }
-      showMsg('配置已更新', 'ok'); loadConfig();
+      showMsg('已保存', 'ok'); loadConfig();
+    }
+    async function switchProfile(name) {
+      await fetch('api/admin.php?action=config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'switch', name })
+      });
+      showMsg('已切换到: '+name, 'ok'); loadConfig();
+    }
+    async function addProfile() {
+      const name = prompt('新配置名称（如：备用Key、国内线路）：');
+      if (!name) return;
+      await fetch('api/admin.php?action=config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'add', name })
+      });
+      showMsg('已添加', 'ok'); loadConfig();
+    }
+    async function deleteProfile(name) {
+      if (!confirm('确定删除「'+name+'」？')) return;
+      await fetch('api/admin.php?action=config', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action:'delete', name })
+      });
+      showMsg('已删除', 'ok'); loadConfig();
     }
 
     // ====== 限制设置 ======

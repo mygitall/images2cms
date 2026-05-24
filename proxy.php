@@ -10,10 +10,12 @@
  *   POST proxy.php?path=/v1/images/edits        (multipart body)
  */
 
-$config = require __DIR__ . '/config.php';
+$config  = require __DIR__ . '/config.php';
+$active  = $config['active'] ?? 'default';
+$profile = $config['profiles'][$active] ?? $config['profiles']['default'] ?? [];
 
-$apiKey  = trim($config['api_key'] ?? '');
-$baseUrl = rtrim($config['base_url'] ?? 'https://api.tokln.com', '/');
+$apiKey  = trim($profile['api_key'] ?? '');
+$baseUrl = rtrim($profile['base_url'] ?? 'https://api.tokln.com', '/');
 $targetPath = $_GET['path'] ?? '';
 
 // ---- 参数校验 ----
