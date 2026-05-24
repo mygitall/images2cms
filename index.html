@@ -179,13 +179,12 @@
     }
 
     /* Card sizes */
-    .card-config      { grid-column: span 3; }
-    .card-folder      { grid-column: span 3; }
-    .card-settings    { grid-column: span 3; }
-    .card-prompt      { grid-column: span 3; }
+    .card-prompt      { grid-column: span 4; }
+    .card-settings    { grid-column: span 2; }
     .card-upload      { grid-column: span 3; }
-    .card-generate    { grid-column: span 3; }
-    .card-presets     { grid-column: span 6; margin-top: 4px; }
+    .card-config      { grid-column: span 3; }
+    .card-folder      { grid-column: span 2; }
+    .card-presets     { grid-column: span 4; margin-top: 4px; }
     .card-results     { grid-column: span 6; margin-top: 4px; }
     .card-history     { grid-column: span 6; margin-top: 4px; }
 
@@ -194,6 +193,31 @@
     }
     .config-inline > div { flex: 1; min-width: 0; }
     .config-inline label { white-space: nowrap; }
+
+    /* Button group (pill selection) */
+    .btn-group {
+      display: flex; gap: 4px; flex-wrap: wrap;
+    }
+    .btn-group button {
+      padding: 6px 14px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-group button:hover {
+      border-color: var(--border-hover);
+      color: var(--text);
+    }
+    .btn-group button.active {
+      background: var(--text);
+      color: var(--btn-text);
+      border-color: var(--text);
+    }
 
     /* ====== Typography ====== */
     .glass-card h2 {
@@ -871,8 +895,8 @@
     /* ====== Responsive ====== */
     @media (max-width: 900px) {
       .bento { grid-template-columns: 1fr; gap: 10px; }
-      .card-config, .card-folder, .card-settings, .card-prompt,
-      .card-upload, .card-generate, .card-presets,
+      .card-prompt, .card-settings, .card-upload,
+      .card-config, .card-folder, .card-presets,
       .card-results, .card-history { grid-column: span 1; }
       .config-inline { flex-direction: column; gap: 8px; }
       .app { padding: 24px 16px 60px; }
@@ -888,11 +912,11 @@
 
     @media (min-width: 901px) and (max-width: 1100px) {
       .bento { grid-template-columns: repeat(4, 1fr); }
+      .card-prompt { grid-column: span 2; }
+      .card-settings { grid-column: span 2; }
+      .card-upload { grid-column: span 2; }
       .card-config { grid-column: span 2; }
       .card-folder { grid-column: span 2; }
-      .card-prompt { grid-column: span 2; }
-      .card-upload { grid-column: span 2; }
-      .card-generate { grid-column: span 2; }
       .card-presets { grid-column: span 4; }
       .card-results { grid-column: span 4; }
       .card-history { grid-column: span 4; }
@@ -914,6 +938,54 @@
 
     <!-- Bento Grid -->
     <div class="bento">
+      <!-- 提示词 -->
+      <div class="glass-card card-prompt">
+        <label for="prompt">提示词（必填）</label>
+        <textarea id="prompt" placeholder="例如：女生坐在口播室，柔和光线，电影感"></textarea>
+        <div class="prompt-buttons-container">
+          <button class="save-prompt-from-input-btn" id="save-prompt-from-input">保存到提示词库</button>
+          <button class="optimize-prompt-btn" id="optimize-prompt-btn">AI 优化提示词</button>
+        </div>
+      </div>
+
+      <!-- 参数 & 生成 -->
+      <div class="glass-card card-settings">
+        <label for="aspect">图片比例</label>
+        <select id="aspect" hidden>
+          <option value="auto">自动</option>
+          <option value="1:1">1:1</option>
+          <option value="3:4">3:4</option>
+          <option value="4:3">4:3</option>
+          <option value="16:9" selected>16:9</option>
+          <option value="9:16">9:16</option>
+        </select>
+        <div class="btn-group" id="aspect-btns"></div>
+
+        <label for="resolution" style="margin-top:10px;">清晰度</label>
+        <select id="resolution" hidden>
+          <option value="1K">1K</option>
+          <option value="2K" selected>2K</option>
+          <option value="4K">4K</option>
+        </select>
+        <div class="btn-group" id="resolution-btns"></div>
+
+        <label for="count" style="margin-top:10px;">生成张数</label>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input id="count" type="number" min="1" max="10" value="1" style="width:72px;">
+          <span class="muted">最多 10 张</span>
+        </div>
+
+        <div class="status" id="status">待发送...</div>
+        <button class="btn" id="run" style="width:100%; margin-top:8px;">发送请求</button>
+      </div>
+
+      <!-- 上传参考图 -->
+      <div class="glass-card card-upload">
+        <label for="image">上传参考图（最多 4 张 · 拖拽/粘贴）</label>
+        <input id="image" type="file" accept="image/png,image/jpeg" multiple style="margin-bottom:8px;">
+        <div class="uploads" id="upload-preview"></div>
+      </div>
+
       <!-- 模型 & 协议 -->
       <div class="glass-card card-config">
         <label>模型 &amp; 协议</label>
@@ -947,52 +1019,6 @@
           <button class="btn-mini" id="select-folder">选择文件夹</button>
           <button class="btn-mini" id="reset-folder" style="display:none;">重置</button>
         </div>
-      </div>
-
-      <!-- 图片参数 -->
-      <div class="glass-card card-settings">
-        <label for="aspect">图片比例</label>
-        <select id="aspect">
-          <option value="auto">自动</option>
-          <option value="1:1">1:1</option>
-          <option value="3:4">3:4</option>
-          <option value="4:3">4:3</option>
-          <option value="16:9" selected>16:9</option>
-          <option value="9:16">9:16</option>
-        </select>
-        <label for="resolution" style="margin-top:12px;">清晰度</label>
-        <select id="resolution">
-          <option value="1K">1K</option>
-          <option value="2K" selected>2K</option>
-          <option value="4K">4K</option>
-        </select>
-        <label for="count" style="margin-top:12px;">生成张数</label>
-        <input id="count" type="number" min="1" max="10" value="1" style="width:80px;">
-        <span class="muted">最多 10 张</span>
-      </div>
-
-      <!-- 提示词 -->
-      <div class="glass-card card-prompt">
-        <label for="prompt">提示词（必填）</label>
-        <textarea id="prompt" placeholder="例如：女生坐在口播室，柔和光线，电影感"></textarea>
-        <div class="prompt-buttons-container">
-          <button class="save-prompt-from-input-btn" id="save-prompt-from-input">保存到提示词库</button>
-          <button class="optimize-prompt-btn" id="optimize-prompt-btn">AI 优化提示词</button>
-        </div>
-      </div>
-
-      <!-- 上传参考图 -->
-      <div class="glass-card card-upload">
-        <label for="image">上传参考图（最多 4 张 · 拖拽/粘贴）</label>
-        <input id="image" type="file" accept="image/png,image/jpeg" multiple style="margin-bottom:8px;">
-        <div class="uploads" id="upload-preview"></div>
-      </div>
-
-      <!-- 生成按钮 -->
-      <div class="glass-card card-generate">
-        <label>&nbsp;</label>
-        <div class="status" id="status">待发送...</div>
-        <button class="btn" id="run" style="width:100%; margin-top:16px;">发送请求</button>
       </div>
 
       <!-- 快捷工具 -->
@@ -1178,6 +1204,29 @@
         return ['auto', '1:1', '3:4', '4:3', '16:9', '9:16'];
       }
 
+      // ---- 按钮组：同步 <select> 到按钮 ----
+      function buildBtnGroup(selectEl, containerEl) {
+        containerEl.innerHTML = '';
+        Array.from(selectEl.options).forEach(opt => {
+          const btn = document.createElement('button');
+          btn.textContent = opt.textContent;
+          btn.dataset.value = opt.value;
+          btn.addEventListener('click', () => {
+            selectEl.value = opt.value;
+            selectEl.dispatchEvent(new Event('change'));
+            updateBtnGroup(containerEl, opt.value);
+          });
+          containerEl.appendChild(btn);
+        });
+        updateBtnGroup(containerEl, selectEl.value);
+      }
+
+      function updateBtnGroup(containerEl, value) {
+        containerEl.querySelectorAll('button').forEach(btn => {
+          btn.classList.toggle('active', btn.dataset.value === value);
+        });
+      }
+
       function refreshAspectOptions() {
         const previousValue = aspectSelect.value;
         const allowedValues = getProtocol() === 'openai-images'
@@ -1190,6 +1239,7 @@
           .forEach(option => aspectSelect.add(new Option(option.text, option.value)));
 
         aspectSelect.value = allowedValues.includes(previousValue) ? previousValue : 'auto';
+        buildBtnGroup(aspectSelect, document.getElementById('aspect-btns'));
       }
 
       // 任务管理：每个任务有独立的定时器
@@ -4765,6 +4815,10 @@ ${chinesePrompt}
 
       loadSettings();
       renderUploads();
+
+      // 初始化按钮组
+      buildBtnGroup(aspectSelect, document.getElementById('aspect-btns'));
+      buildBtnGroup(resolutionSelect, document.getElementById('resolution-btns'));
 
       // 初始化快捷按钮
       initPresetButtons();
