@@ -1,12 +1,13 @@
 <?php
 /**
- * 从服务器加载已保存的图片
- * GET: load.php?file=xxx.png
+ * 从服务器加载已保存的图片（支持用户子目录）
+ * GET: load.php?file=xxx.png&user=username
  */
 
 $config  = require __DIR__ . '/config.php';
 $saveDir = rtrim($config['save_dir'], '/');
 $file    = $_GET['file'] ?? '';
+$user    = $_GET['user'] ?? '';
 
 if (empty($file)) {
     http_response_code(400);
@@ -15,7 +16,6 @@ if (empty($file)) {
     exit;
 }
 
-// 安全检查
 if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $file)) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
@@ -23,7 +23,18 @@ if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $file)) {
     exit;
 }
 
-$filePath = $saveDir . '/' . $file;
+// 先查用户子目录，找不到则查根目录
+$rootDir = $saveDir;
+if (!empty($user) && preg_match('/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}\-]+$/u', $user)) {
+    $filePath = $saveDir . '/' . $user . '/' . $file;
+    if (file_exists($filePath)) {
+        $found = true;
+    }
+}
+
+if (empty($found)) {
+    $filePath = $rootDir . '/' . $file;
+}
 
 if (!file_exists($filePath)) {
     http_response_code(404);
@@ -32,15 +43,8 @@ if (!file_exists($filePath)) {
     exit;
 }
 
-// 根据扩展名设置 MIME 类型
 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
-$mimeTypes = [
-    'png'  => 'image/png',
-    'jpg'  => 'image/jpeg',
-    'jpeg' => 'image/jpeg',
-    'gif'  => 'image/gif',
-    'webp' => 'image/webp',
-];
+$mimeTypes = ['png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','gif'=>'image/gif','webp'=>'image/webp'];
 $mime = $mimeTypes[$ext] ?? 'image/png';
 
 header('Content-Type: ' . $mime);

@@ -1,7 +1,7 @@
 <?php
 /**
- * 保存图片到服务器
- * POST: { url: "https://..." } 或 { image: "data:image/png;base64,..." }  + filename
+ * 保存图片到服务器（按用户名分目录）
+ * POST: { url: "https://..." } 或 { image: "data:image/png;base64,..." } + filename + username
  */
 
 $config   = require __DIR__ . '/config.php';
@@ -9,6 +9,7 @@ $saveDir  = rtrim($config['save_dir'], '/');
 $url      = $_POST['url']      ?? '';
 $image    = $_POST['image']    ?? '';
 $filename = $_POST['filename'] ?? '';
+$username = $_POST['username'] ?? '';
 
 if ((empty($image) && empty($url)) || empty($filename)) {
     http_response_code(400);
@@ -22,6 +23,11 @@ if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $filename)) {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['error' => '文件名包含非法字符'], JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+// 用户子目录：uploads/{username}/（不登录则放 uploads/）
+if (!empty($username) && preg_match('/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}\-]+$/u', $username)) {
+    $saveDir .= '/' . $username;
 }
 
 if (!is_dir($saveDir)) {
@@ -47,7 +53,6 @@ if (!empty($url) && preg_match('#^https?://#', $url)) {
         exit;
     }
 } else {
-    // base64 解码
     if (preg_match('#^data:image/\w+;base64,(.+)$#', $image, $m)) {
         $binary = base64_decode($m[1]);
     } else {

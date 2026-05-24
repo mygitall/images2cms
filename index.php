@@ -1,4 +1,4 @@
-﻿<!doctype html>
+﻿<?php session_start(); ?><!doctype html>
 <html lang="zh">
 
 <head>
@@ -290,6 +290,35 @@
       cursor: not-allowed;
     }
 
+    /* File input button */
+    input[type="file"] {
+      width: 100%;
+      padding: 9px 14px;
+      font-size: 13px;
+      font-family: var(--font);
+      color: var(--text-secondary);
+      background: var(--input-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    input[type="file"]:hover { border-color: var(--border-hover); }
+    input[type="file"]::file-selector-button {
+      padding: 5px 14px;
+      margin-right: 10px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    input[type="file"]::file-selector-button:hover { background: var(--card-hover); }
+
     /* ====== Buttons ====== */
     .btn {
       display: inline-flex;
@@ -513,7 +542,7 @@
     }
     .history-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: repeat(2, 1fr);
       gap: 10px;
       margin-top: 12px;
     }
@@ -914,7 +943,7 @@
       .hero { margin-bottom: 24px; }
       .hero h1 { font-size: 24px; }
       .results { grid-template-columns: 1fr; }
-      .history-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+      .history-grid { grid-template-columns: repeat(2, 1fr); }
       .row { grid-template-columns: 1fr; }
       .config-row { flex-direction: column; }
       .config-row > * { min-width: 0; }
@@ -944,8 +973,30 @@
         <p class="sub">文生图 / 图生图 · 参考图最多 4 张</p>
         <span class="badge">&#9702; API 已在后端配置</span>
       </div>
-      <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span class="hero-user" id="hero-user" style="display:none;font-size:13px;color:var(--text-secondary)"></span>
+        <button class="btn-ghost" id="login-btn" style="font-size:12px;">登录</button>
+        <button class="btn-ghost" id="logout-btn" style="display:none;font-size:12px;">退出</button>
+        <a class="btn-ghost" id="admin-link" href="admin.php" target="_blank" style="display:none;font-size:12px;text-decoration:none;">后台</a>
+        <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
+      </div>
     </header>
+
+    <!-- 登录注册弹窗 -->
+    <div class="dialog-overlay" id="auth-dialog">
+      <div class="dialog-content">
+        <div class="dialog-title" id="auth-title">登录</div>
+        <input class="dialog-input" id="auth-username" type="text" placeholder="用户名">
+        <input class="dialog-input" id="auth-password" type="password" placeholder="密码">
+        <div class="dialog-actions">
+          <button class="dialog-btn dialog-btn-cancel" id="auth-cancel">取消</button>
+          <button class="dialog-btn dialog-btn-confirm" id="auth-submit">登录</button>
+        </div>
+        <div style="text-align:center;margin-top:12px;font-size:12px;color:var(--text-tertiary)">
+          <a href="#" id="auth-switch" style="color:var(--text-secondary)">没有账号？去注册</a>
+        </div>
+      </div>
+    </div>
 
     <!-- Bento Grid -->
     <div class="bento">
@@ -986,8 +1037,8 @@
           <span class="muted">最多 10 张</span>
         </div>
 
-        <div class="status" id="status">待发送...</div>
-        <button class="btn" id="run" style="width:100%; margin-top:8px;">发送请求</button>
+        <div class="status" id="status">请先登录后再生成图片</div>
+        <button class="btn" id="run" style="width:100%; margin-top:8px;">开始生图</button>
       </div>
 
       <!-- 结果 & 历史（共享同一位置，互斥显示） -->
@@ -1005,6 +1056,7 @@
           <div class="history-header">
             <h2>历史记录</h2>
             <span class="muted" id="history-count">0 条</span>
+            <button class="btn-ghost" id="batch-download" style="display:none">批量下载</button>
             <button class="btn-ghost" id="clear-history">清空历史</button>
           </div>
           <div class="history-grid" id="history-grid">
@@ -1026,18 +1078,18 @@
         <div class="config-inline">
           <div>
             <select id="image-model">
-              <option value="gemini-3-pro-image-preview" selected>gemini-3-pro-image-preview</option>
+              <option value="gpt-image-2" selected>gpt-image-2</option>
             </select>
           </div>
           <div>
             <select id="text-model">
-              <option value="gemini-3-flash-preview" selected>gemini-3-flash-preview</option>
+              <option value="deepseek-v4-pro" selected>deepseek-v4-pro</option>
             </select>
           </div>
           <div>
             <select id="api-protocol">
               <option value="gemini">Gemini 原生</option>
-              <option value="openai-chat" selected>OpenAI Chat</option>
+              <option value="openai-images" selected>OpenAI Images</option>
               <option value="openai-images">OpenAI Images</option>
             </select>
           </div>
@@ -1155,17 +1207,17 @@
       const protocolSelect = document.getElementById('api-protocol');
 
       function getImageModel() {
-        return imageModelSelect.value || 'gemini-3-pro-image-preview';
+        return imageModelSelect.value || 'gpt-image-2';
       }
       function generateFilename(ext) {
         const model = getImageModel().replace(/[^a-zA-Z0-9\-]/g, '-');
         return `${model}-${Date.now()}.${ext}`;
       }
       function getTextModel() {
-        return textModelSelect.value || 'gemini-3-flash-preview';
+        return textModelSelect.value || 'deepseek-v4-pro';
       }
       function getProtocol() {
-        return protocolSelect.value || 'openai-chat';
+        return protocolSelect.value || 'openai-images';
       }
 
       // 获取生图 endpoint（根据协议自动切换）
@@ -1581,26 +1633,73 @@
       }
 
       // 渲染历史记录
-      async function renderHistory() {
-        try {
-          const records = await loadHistory();
-          console.log('[renderHistory] 加载到', records.length, '条记录');
-          historyCountEl.textContent = `${records.length} 条`;
+      let historyPage = 1;
+      let historyServerTotal = 0; // 服务器端记录总数
+      const HISTORY_PAGE_SIZE = 2; // 1行 x 2列
 
+      async function renderHistory(page = 1) {
+        try {
+          // 未登录 → 隐藏历史
+          if (!currentUser) {
+            historyGrid.innerHTML = '<div class="history-empty">请登录后查看历史记录</div>';
+            historyCountEl.textContent = '0 条';
+            return;
+          }
+
+          // 登录后从服务器加载（跨设备同步）
+          let records = [];
+          let totalFromServer = 0;
+          try {
+            const serverPage = Math.ceil((page * HISTORY_PAGE_SIZE) / 50); // 服务端每页50条
+            const res = await fetch(`api/history.php?page=${serverPage}`);
+            if (res.ok) {
+              const data = await res.json();
+              historyServerTotal = data.total || 0;
+              totalFromServer = data.total || 0;
+              records = (data.list || []).map(r => ({
+                id: 'srv_' + r.id,
+                filename: r.filename,
+                prompt: r.prompt || '',
+                timestamp: new Date(r.created_at).getTime(),
+                thumbnail: `load.php?file=${encodeURIComponent(r.filename)}&user=${encodeURIComponent(currentUser.username)}`,
+                username: currentUser.username
+              }));
+            }
+          } catch (e) {
+            console.warn('服务器历史加载失败', e.message);
+          }
+
+          // 服务器无数据时降级到本地 IndexedDB
           if (records.length === 0) {
-            historyGrid.innerHTML = '<div class="history-empty">暂无历史记录</div>';
+            const local = await loadHistory();
+            records = local.filter(r => r.username === currentUser.username);
+            totalFromServer = records.length;
+          }
+
+          const totalPages = Math.ceil(totalFromServer / HISTORY_PAGE_SIZE) || 1;
+          historyPage = Math.min(page, totalPages);
+          const start = (historyPage - 1) * HISTORY_PAGE_SIZE;
+          const pageRecords = records.slice(start, start + HISTORY_PAGE_SIZE);
+
+          console.log('[renderHistory] 总', totalFromServer, '条，第', historyPage, '页');
+          historyCountEl.textContent = `${totalFromServer} 条`;
+
+          if (totalFromServer === 0) {
+            historyGrid.innerHTML = '<div class="history-empty">暂无生成记录</div>';
             return;
           }
 
           historyGrid.innerHTML = '';
-          records.forEach(record => {
+          pageRecords.forEach(record => {
             const card = document.createElement('div');
             card.className = 'history-card';
 
             // 判断是否有文件名（新版本记录才有）
             const hasFilename = record.filename && record.filename.length > 0;
 
+            card.style.position = 'relative';
             card.innerHTML = `
+              <input type="checkbox" class="hist-check" data-file="${escapeHtml(record.filename||'')}" style="position:absolute;top:8px;left:8px;z-index:2;width:16px;height:16px;accent-color:var(--text);cursor:pointer" title="选择下载">
               <img src="${record.thumbnail}" alt="缩略图">
               <div class="info">
                 <div class="prompt-container">
@@ -1609,7 +1708,7 @@
                 <div class="meta">
                   <span>${formatDate(record.timestamp)}</span>
                   ${hasFilename ? '<button class="add-btn" title="添加到参考图">➕</button>' : ''}
-                  ${hasFilename ? '<button class="hd-btn" title="从文件夹加载高清图">🔍HD</button>' : ''}
+                  ${hasFilename ? '<button class="hd-btn" title="从文件夹加载高清图">🔍</button>' : ''}
                   <button class="save-prompt-btn" title="保存提示词到库">💾</button>
                   <button class="delete-btn" data-id="${record.id}">🗑️</button>
                 </div>
@@ -1638,8 +1737,25 @@
             promptEl.style.cursor = 'pointer';
             promptEl.addEventListener('click', async () => {
               const promptText = record.prompt || '无提示词';
+              let ok = false;
               try {
-                await navigator.clipboard.writeText(promptText);
+                if (navigator.clipboard) {
+                  await navigator.clipboard.writeText(promptText);
+                  ok = true;
+                }
+              } catch (_) {}
+              if (!ok) {
+                // HTTP 环境降级方案
+                try {
+                  const ta = document.createElement('textarea');
+                  ta.value = promptText; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                  document.body.appendChild(ta); ta.select();
+                  document.execCommand('copy');
+                  document.body.removeChild(ta);
+                  ok = true;
+                } catch (_) {}
+              }
+              if (ok) {
                 const originalText = promptEl.textContent;
                 promptEl.textContent = '✓ 已复制';
                 promptEl.style.color = 'var(--success)';
@@ -1647,9 +1763,6 @@
                   promptEl.textContent = originalText;
                   promptEl.style.color = '';
                 }, 1500);
-              } catch (err) {
-                console.error('复制失败:', err);
-                alert('复制失败，请手动选择文本复制');
               }
             });
 
@@ -1771,13 +1884,54 @@
             card.querySelector('.delete-btn').addEventListener('click', async (e) => {
               e.stopPropagation();
               if (confirm('确定删除这条历史记录？')) {
-                await deleteHistoryById(record.id);
+                // 服务端记录 → 软删除（管理员后台仍可见）
+                if (String(record.id).startsWith('srv_')) {
+                  const srvId = String(record.id).replace('srv_', '');
+                  try { await fetch(`api/history.php?action=delete&id=${srvId}`); } catch (_) {}
+                }
+                // 也从本地 IndexedDB 删除
+                if (!String(record.id).startsWith('srv_')) {
+                  await deleteHistoryById(record.id);
+                }
                 await renderHistory();
               }
             });
 
             historyGrid.appendChild(card);
           });
+
+          // 翻页控制（最多显示 7 个页码）
+          if (totalPages > 1) {
+            const pager = document.createElement('div');
+            pager.style.cssText = 'grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:4px;margin-top:12px;flex-wrap:wrap;';
+
+            const pages = [];
+            if (totalPages <= 7) {
+              for (let p = 1; p <= totalPages; p++) pages.push(p);
+            } else {
+              pages.push(1);
+              if (historyPage > 3) pages.push('...');
+              for (let p = Math.max(2, historyPage - 1); p <= Math.min(totalPages - 1, historyPage + 1); p++) pages.push(p);
+              if (historyPage < totalPages - 2) pages.push('...');
+              pages.push(totalPages);
+            }
+
+            let btns = `<button class="btn-mini hist-page-btn" ${historyPage <= 1 ? 'disabled' : ''} data-p="${historyPage - 1}">‹</button>`;
+            pages.forEach(p => {
+              if (p === '...') btns += '<span style="padding:0 4px;color:var(--text-tertiary)">…</span>';
+              else btns += `<button class="btn-mini hist-page-btn" style="${p === historyPage ? 'background:var(--text);color:var(--btn-text);border:none;min-width:28px' : 'min-width:28px'}" data-p="${p}">${p}</button>`;
+            });
+            btns += `<button class="btn-mini hist-page-btn" ${historyPage >= totalPages ? 'disabled' : ''} data-p="${historyPage + 1}">›</button>`;
+            pager.innerHTML = btns;
+            historyGrid.appendChild(pager);
+
+            pager.querySelectorAll('.hist-page-btn').forEach(btn => {
+              btn.addEventListener('click', () => {
+                const p = parseInt(btn.dataset.p);
+                if (p >= 1 && p <= totalPages) renderHistory(p);
+              });
+            });
+          }
         } catch (err) {
           console.error('加载历史记录失败:', err);
           historyGrid.innerHTML = '<div class="history-empty">加载历史记录失败</div>';
@@ -1942,17 +2096,21 @@
             // 复制按钮
             const copyBtn = item.querySelector('[data-action="copy"]');
             copyBtn.addEventListener('click', async () => {
-              try {
-                await navigator.clipboard.writeText(prompt.content);
+              let ok = false;
+              try { if (navigator.clipboard) { await navigator.clipboard.writeText(prompt.content); ok = true; } } catch (_) {}
+              if (!ok) {
+                try {
+                  const ta = document.createElement('textarea');
+                  ta.value = prompt.content; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                  document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+                  ok = true;
+                } catch (_) {}
+              }
+              if (ok) {
                 const originalText = copyBtn.textContent;
                 copyBtn.textContent = '✓ 已复制';
                 copyBtn.style.color = 'var(--success)';
-                setTimeout(() => {
-                  copyBtn.textContent = originalText;
-                  copyBtn.style.color = '';
-                }, 1500);
-              } catch (err) {
-                alert('复制失败：' + err.message);
+                setTimeout(() => { copyBtn.textContent = originalText; copyBtn.style.color = ''; }, 1500);
               }
             });
 
@@ -1981,14 +2139,30 @@
 
 
       // 选择保存文件夹
+      // 保存生成记录到服务端 MySQL
+      async function saveImageRecord(filename, prompt) {
+        if (!currentUser) return;
+        try {
+          await fetch('api/record.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename, prompt,
+              model: getImageModel(),
+              aspect: aspectSelect.value,
+              resolution: resolutionSelect.value
+            })
+          });
+        } catch (_) {}
+      }
+
       // 保存图片到服务器 uploads/ 目录
       async function saveImageFile(imgSrc, filename) {
         try {
           const formData = new FormData();
           formData.append('filename', filename);
+          if (currentUser) formData.append('username', currentUser.username);
 
           if (/^https?:\/\//.test(imgSrc)) {
-            // URL 图片交给 PHP 下载（避免 CORS）
             formData.append('url', imgSrc);
           } else {
             formData.append('image', imgSrc);
@@ -1997,7 +2171,7 @@
           const res = await fetch('save.php', { method: 'POST', body: formData });
           const data = await res.json();
           if (data.success) {
-            console.log(`图片已保存到服务器: ${filename} (${(data.size / 1024 / 1024).toFixed(2)}MB)`);
+            console.log(`图片已保存到服务器: ${data.path}`);
             return true;
           }
           console.error('服务器保存失败:', data.error);
@@ -2010,7 +2184,9 @@
 
       // 从服务器加载高清原图
       async function loadServerImage(filename) {
-        const res = await fetch(`load.php?file=${encodeURIComponent(filename)}`);
+        let url = `load.php?file=${encodeURIComponent(filename)}`;
+        if (currentUser) url += `&user=${encodeURIComponent(currentUser.username)}`;
+        const res = await fetch(url);
         if (!res.ok) throw new Error(`文件不存在：${filename}`);
         const blob = await res.blob();
         return new Promise((resolve, reject) => {
@@ -3533,7 +3709,7 @@ ${chinesePrompt}
         card.innerHTML = `
           <div style="text-align: center; color: var(--muted);">
             <div style="font-size: 48px; margin-bottom: 12px; animation: spin 2s linear infinite;">⏳</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text);">生成中 #${index}</div>
+            <div style="font-size: 14px; font-weight: 600; color: var(--text);">生成中 -大约2分钟完成#${index}</div>
             <div class="card-timer" style="font-size: 12px; margin-top: 4px; color: var(--accent);">0.0s</div>
           </div>
           <style>
@@ -3599,6 +3775,7 @@ ${chinesePrompt}
         placeholderCard.style.alignItems = '';
         placeholderCard.style.justifyContent = '';
 
+        console.log('[replaceCardWithResult] hasImage:', hasResultImage(result), 'imgSrc preview:', getResultImgSrc(result)?.slice(0, 80));
         if (hasResultImage(result)) {
           const imgSrc = getResultImgSrc(result);
           const imgEl = document.createElement('img');
@@ -3690,11 +3867,13 @@ ${chinesePrompt}
               prompt: meta?.prompt || '',
               aspect: meta?.aspect || '',
               resolution: meta?.resolution || '',
+              username: currentUser?.username || '',
               timestamp: Date.now()
             };
             await saveHistory(historyRecord);
             await renderHistory();
             await saveImageFile(imgSrc, filename);
+            saveImageRecord(filename, meta?.prompt || '');
 
             console.log('图片已自动保存并添加到历史记录:', filename);
           } catch (err) {
@@ -3812,6 +3991,7 @@ ${chinesePrompt}
               prompt: meta?.prompt || '',
               aspect: meta?.aspect || '',
               resolution: meta?.resolution || '',
+              username: currentUser?.username || '',
               timestamp: Date.now()
             };
             await saveHistory(historyRecord);
@@ -3821,6 +4001,7 @@ ${chinesePrompt}
 
             // 自动保存原图到文件夹或下载
             await saveImageFile(imgSrc, filename);
+            saveImageRecord(filename, meta?.prompt || '');
 
             console.log('图片已自动保存并添加到历史记录:', filename);
           } catch (err) {
@@ -3890,6 +4071,14 @@ ${chinesePrompt}
       }
 
       async function handleRun() {
+        if (!currentUser) return flashStatus('请先登录后再生成图片', 'danger');
+
+        // 检查生成限制
+        try {
+          const check = await (await fetch('api/record.php?action=check')).json();
+          if (!check.can_generate) return flashStatus(check.reason, 'danger');
+        } catch (_) {}
+
         const prompt = promptInput.value.trim();
         const count = Math.max(1, Math.min(10, parseInt(countInput.value, 10) || 1));
         if (!prompt) return flashStatus('提示词必填', 'danger');
@@ -4744,9 +4933,11 @@ ${chinesePrompt}
                 prompt: angleName,
                 aspect: aspectSelect.value,
                 resolution: resolutionSelect.value,
+                username: currentUser?.username || '',
                 timestamp: Date.now()
               });
               await saveImageFile(newImgSrc, filename);
+              saveImageRecord(filename, angleName);
               await renderHistory();
 
               flashStatus(`${angleName} 重新生成成功`, 'success');
@@ -4775,10 +4966,12 @@ ${chinesePrompt}
             prompt: angleName,
             aspect: aspectSelect.value,
             resolution: resolutionSelect.value,
+            username: currentUser?.username || '',
             timestamp: Date.now()
           });
 
           await saveImageFile(imgSrc, filename);
+          saveImageRecord(filename, angleName);
 
           // 刷新历史记录显示
           await renderHistory();
@@ -4931,6 +5124,151 @@ ${chinesePrompt}
       }).catch(err => {
         console.error('初始化数据库失败:', err);
       });
+
+      // ====== 登录 & 注册 ======
+      const authDialog = document.getElementById('auth-dialog');
+      const authTitle  = document.getElementById('auth-title');
+      const authSubmit = document.getElementById('auth-submit');
+      const authSwitch = document.getElementById('auth-switch');
+      const authCancel = document.getElementById('auth-cancel');
+      const authUser   = document.getElementById('auth-username');
+      const authPass   = document.getElementById('auth-password');
+      const loginBtn   = document.getElementById('login-btn');
+      const logoutBtn  = document.getElementById('logout-btn');
+      const adminLink  = document.getElementById('admin-link');
+      const heroUser   = document.getElementById('hero-user');
+
+      let authMode = 'login'; // 'login' | 'register'
+      let currentUser = null;
+
+      function updateAuthUI() {
+        if (currentUser) {
+          heroUser.style.display = ''; heroUser.textContent = currentUser.username;
+          loginBtn.style.display = 'none'; logoutBtn.style.display = '';
+          if (currentUser.role === 'admin') { adminLink.style.display = ''; }
+          if (statusEl.textContent === '请先登录后再生成图片') statusEl.textContent = '待发送...';
+        } else {
+          heroUser.style.display = 'none'; loginBtn.style.display = '';
+          logoutBtn.style.display = 'none'; adminLink.style.display = 'none';
+          statusEl.textContent = '请先登录后再生成图片';
+        }
+        renderHistory(); // 切换用户时刷新历史
+      }
+
+      function openAuthDialog(mode) {
+        authMode = mode;
+        authTitle.textContent = mode === 'login' ? '登录' : '注册';
+        authSubmit.textContent = mode === 'login' ? '登录' : '注册';
+        authSwitch.innerHTML = mode === 'login'
+          ? '<a href="#" style="color:var(--text-secondary)">没有账号？去注册</a>'
+          : '<a href="#" style="color:var(--text-secondary)">已有账号？去登录</a>';
+        authDialog.classList.add('active');
+        authUser.value = ''; authPass.value = '';
+        setTimeout(() => authUser.focus(), 100);
+      }
+
+      function closeAuthDialog() { authDialog.classList.remove('active'); }
+
+      async function doAuth() {
+        const username = authUser.value.trim();
+        const password = authPass.value.trim();
+        if (!username || !password) { flashStatus('请填写用户名和密码', 'danger'); return; }
+
+        authSubmit.disabled = true; authSubmit.textContent = '处理中...';
+        try {
+          const res = await fetch(`api/auth.php?action=${authMode}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            flashStatus(data.error || `请求失败 (${res.status})`, 'danger');
+            return;
+          }
+          currentUser = data;
+          updateAuthUI();
+          closeAuthDialog();
+          flashStatus(authMode === 'login' ? '登录成功' : '注册成功', 'success');
+        } catch (err) {
+          flashStatus('网络请求失败，请检查服务', 'danger');
+          console.error('Auth error:', err);
+        } finally {
+          authSubmit.disabled = false;
+          authSubmit.textContent = authMode === 'login' ? '登录' : '注册';
+        }
+      }
+
+      async function doLogout() {
+        await fetch('api/auth.php?action=logout', { method: 'POST' });
+        currentUser = null;
+        updateAuthUI();
+        toggleResults(false); // 切回历史视图
+        flashStatus('已退出登录', 'success');
+      }
+
+      async function checkSession() {
+        try {
+          const res = await fetch('api/auth.php?action=me');
+          const data = await res.json();
+          if (data && data.id) { currentUser = data; updateAuthUI(); }
+        } catch (_) {}
+      }
+
+      loginBtn.addEventListener('click', () => openAuthDialog('login'));
+      logoutBtn.addEventListener('click', doLogout);
+      authCancel.addEventListener('click', closeAuthDialog);
+      authSubmit.addEventListener('click', doAuth);
+      authSwitch.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAuthDialog(authMode === 'login' ? 'register' : 'login');
+      });
+      authDialog.addEventListener('click', (e) => { if (e.target === authDialog) closeAuthDialog(); });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && authDialog.classList.contains('active')) closeAuthDialog();
+        if (e.key === 'Enter' && authDialog.classList.contains('active')) doAuth();
+      });
+
+      // ====== Ctrl+Enter 发送 ======
+      promptInput.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          handleRun();
+        }
+      });
+
+      // ====== 批量下载 ======
+      const batchDownloadBtn = document.getElementById('batch-download');
+      batchDownloadBtn.addEventListener('click', async () => {
+        const checks = document.querySelectorAll('.hist-check:checked');
+        if (checks.length === 0) { flashStatus('请先勾选要下载的图片', 'danger'); return; }
+        const files = Array.from(checks).map(cb => cb.dataset.file);
+        const username = currentUser?.username || '';
+        batchDownloadBtn.textContent = '打包中...'; batchDownloadBtn.disabled = true;
+        try {
+          const res = await fetch('download.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files, user: username })
+          });
+          if (!res.ok) { flashStatus('下载失败，文件可能不存在', 'danger'); return; }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a'); a.href = url;
+          a.download = files.length === 1 ? files[0] : 'images.zip'; a.click();
+          URL.revokeObjectURL(url);
+          flashStatus(`已下载 ${files.length} 张`, 'success');
+        } catch (e) { flashStatus('下载失败', 'danger'); }
+        finally { batchDownloadBtn.textContent = '批量下载'; batchDownloadBtn.disabled = false; }
+      });
+
+      // 监听复选框变化，显示/隐藏批量下载按钮
+      document.addEventListener('change', (e) => {
+        if (e.target.classList.contains('hist-check')) {
+          const any = document.querySelectorAll('.hist-check:checked').length > 0;
+          batchDownloadBtn.style.display = any ? '' : 'none';
+        }
+      });
+
+      checkSession();
 
       // ====== 主题切换 ======
       const themeToggle = document.getElementById('theme-toggle');
