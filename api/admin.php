@@ -143,6 +143,65 @@ if ($action === 'limits') {
     }
 }
 
+// ========== API 调用日志 ==========
+if ($action === 'api_logs') {
+    $page  = max(1, intval($_GET['page'] ?? 1));
+    $limit = 30;
+    $offset = ($page - 1) * $limit;
+    $total = $pdo->query('SELECT COUNT(*) FROM api_logs')->fetchColumn();
+    $stmt  = $pdo->prepare(
+        'SELECT l.*, u.username FROM api_logs l
+         LEFT JOIN users u ON l.user_id = u.id
+         ORDER BY l.created_at DESC LIMIT :l OFFSET :o'
+    );
+    $stmt->bindValue(':l', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':o', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    ok(['list' => $stmt->fetchAll(), 'total' => intval($total), 'page' => $page, 'pages' => ceil($total / $limit)]);
+}
+
+// ========== 统计仪表盘 ==========
+if ($action === 'stats') {
+    // 每日生成量（最近30天）
+    $daily = $pdo->query(
+        "SELECT DATE(created_at) AS day, COUNT(*) AS cnt FROM gen_images
+         WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY DATE(created_at) ORDER BY day"
+    )->fetchAll();
+
+    // 模型使用分布
+    $models = $pdo->query(
+        "SELECT model, COUNT(*) AS cnt FROM gen_images
+         WHERE model != '' GROUP BY model ORDER BY cnt DESC LIMIT 10"
+    )->fetchAll();
+
+    // 用户活跃度（最近30天）
+    $users = $pdo->query(
+        "SELECT u.username, COUNT(*) AS cnt FROM gen_images i
+         JOIN users u ON i.user_id = u.id
+         WHERE i.created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+         GROUP BY i.user_id ORDER BY cnt DESC LIMIT 10"
+    )->fetchAll();
+
+    // 今日统计
+    $today = $pdo->query(
+        "SELECT COUNT(*) AS total,
+                COUNT(DISTINCT user_id) AS active_users
+         FROM gen_images WHERE DATE(created_at) = CURDATE()"
+    )->fetch();
+
+    // 总览
+    $overview = $pdo->query(
+        "SELECT
+            (SELECT COUNT(*) FROM gen_images) AS total_images,
+            (SELECT COUNT(*) FROM users) AS total_users,
+            (SELECT COUNT(*) FROM gen_images WHERE deleted_at IS NOT NULL) AS deleted_images,
+            (SELECT COUNT(*) FROM gen_images WHERE DATE(created_at) = CURDATE()) AS today_images"
+    )->fetch();
+
+    ok(['daily' => $daily, 'models' => $models, 'users' => $users, 'today' => $today, 'overview' => $overview]);
+}
+
 // ========== 全量操作日志（admin 专用）==========
 if ($action === 'all_logs') {
     $page  = max(1, intval($_GET['page'] ?? 1));

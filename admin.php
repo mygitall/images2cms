@@ -8,6 +8,7 @@ $isAdmin = $user && $user['role'] === 'admin';
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>后台管理 — Image Studio</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --bg: #f5f5f7;
@@ -140,6 +141,8 @@ $isAdmin = $user && $user['role'] === 'admin';
       <div class="tabs">
         <button class="active" data-tab="images">图片记录</button>
         <button data-tab="users">用户管理</button>
+        <button data-tab="stats">用量统计</button>
+        <button data-tab="apilog">API 日志</button>
         <button data-tab="logs">操作记录</button>
         <button data-tab="config">API 配置</button>
       </div>
@@ -170,6 +173,33 @@ $isAdmin = $user && $user['role'] === 'admin';
         <div id="logs-content" style="background:#fff;border-radius:16px;padding:24px;max-height:70vh;overflow-y:auto;border:1px solid var(--card-border)">
           <table style="width:100%"><thead><tr><th>操作</th><th>用户</th><th>详情</th><th>模型</th><th>时间</th><th>状态</th></tr></thead>
             <tbody id="logs-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <div class="card tab-content" id="tab-apilog" style="display:none">
+        <h2>API 调用日志</h2>
+        <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);max-height:65vh;overflow-y:auto">
+          <table style="width:100%"><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>耗时</th><th>状态码</th><th>结果</th></tr></thead>
+            <tbody id="apilog-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        </div>
+      </div>
+
+      <div class="card tab-content" id="tab-stats" style="display:none">
+        <h2>用量统计仪表盘</h2>
+        <div id="stats-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
+          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+            <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">每日生成量（近30天）</h3>
+            <canvas id="chart-daily" height="120"></canvas>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+            <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">用户活跃度（近30天）</h3>
+            <canvas id="chart-users" height="120"></canvas>
+          </div>
+          <div style="background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+            <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">模型使用分布</h3>
+            <canvas id="chart-models" height="120"></canvas>
+          </div>
         </div>
       </div>
 
@@ -259,6 +289,8 @@ $isAdmin = $user && $user['role'] === 'admin';
       location.href = 'index.php';
     });
 
+    let imagesPage = 1;
+
     // 已登录 → 直接显示面板
     <?php if ($isAdmin): ?>
     document.getElementById('login-box').style.display = 'none';
@@ -277,12 +309,13 @@ $isAdmin = $user && $user['role'] === 'admin';
         if (btn.dataset.tab === 'images') loadImages();
         if (btn.dataset.tab === 'users') loadUsers();
         if (btn.dataset.tab === 'logs') loadAllLogs();
+        if (btn.dataset.tab === 'stats') loadStats();
+        if (btn.dataset.tab === 'apilog') loadApiLogs();
         if (btn.dataset.tab === 'config') loadConfig();
       });
     });
 
     // ====== 图片列表 ======
-    let imagesPage = 1;
     async function loadImages(page = 1) {
       imagesPage = page;
       const res = await fetch(`api/admin.php?action=images&page=${page}`);
@@ -476,6 +509,111 @@ $isAdmin = $user && $user['role'] === 'admin';
         pager.querySelector('#logs-prev')?.addEventListener('click', () => loadAllLogs(data.page - 1));
         pager.querySelector('#logs-next')?.addEventListener('click', () => loadAllLogs(data.page + 1));
       } else if (pager) { pager.remove(); }
+    }
+
+    // ====== API 日志 ======
+    let apiLogPage = 1;
+    async function loadApiLogs(page = 1) {
+      apiLogPage = page;
+      const res = await fetch(`api/admin.php?action=api_logs&page=${page}`);
+      const data = await res.json();
+      const tbody = document.getElementById('apilog-tbody');
+      if (!data.list || !data.list.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-tertiary)">暂无日志</td></tr>';
+      } else {
+        tbody.innerHTML = data.list.map(r => {
+          const durationColor = r.duration_ms > 30000 ? 'var(--danger)' : r.duration_ms > 10000 ? '#f59e0b' : 'var(--success)';
+          return `<tr>
+            <td style="font-size:11px">${(r.created_at||'').replace(' ','<br>')}</td>
+            <td style="font-size:11px">${esc(r.username||'-')}</td>
+            <td style="font-size:11px;font-family:monospace;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.endpoint||'')}</td>
+            <td style="font-size:11px;color:${durationColor}">${r.duration_ms > 1000 ? (r.duration_ms/1000).toFixed(1)+'s' : r.duration_ms+'ms'}</td>
+            <td style="font-size:11px">${r.http_code||''}</td>
+            <td><span style="font-size:11px;color:${r.status==='error'?'var(--danger)':'var(--success)'}">${r.status==='error'?'失败':'成功'}</span></td>
+          </tr>`;
+        }).join('');
+      }
+      // 翻页
+      const pagerEl = document.getElementById('apilog-pager');
+      if (data.pages > 1) {
+        let html = `<button class="btn-ghost" ${data.page<=1?'disabled':''} id="apilog-prev">上一页</button>
+          <span style="font-size:12px;color:var(--text-tertiary)">${data.page}/${data.pages} · ${data.total}条</span>
+          <button class="btn-ghost" ${data.page>=data.pages?'disabled':''} id="apilog-next">下一页</button>`;
+        if (!pagerEl) { const p = document.createElement('div'); p.id = 'apilog-pager'; p.style.cssText = 'text-align:center;margin-top:12px'; p.innerHTML = html; tbody.parentElement.parentElement.appendChild(p); }
+        else pagerEl.innerHTML = html;
+        setTimeout(() => {
+          document.getElementById('apilog-prev')?.addEventListener('click', () => loadApiLogs(data.page-1));
+          document.getElementById('apilog-next')?.addEventListener('click', () => loadApiLogs(data.page+1));
+        }, 0);
+      } else if (pagerEl) pagerEl.remove();
+    }
+
+    // ====== 统计仪表盘 ======
+    let statsCharts = {};
+    async function loadStats() {
+      const res = await fetch('api/admin.php?action=stats');
+      const data = await res.json();
+      console.log('[stats]', data);
+
+      // 等待容器可见后渲染
+      await new Promise(r => requestAnimationFrame(r));
+
+      // 概览卡片
+      const ov = data.overview || {};
+      document.getElementById('stats-overview').innerHTML = [
+        { label: '总生成量', value: ov.total_images || 0 },
+        { label: '今日生成', value: ov.today_images || 0 },
+        { label: '总用户数', value: ov.total_users || 0 },
+        { label: '已删图片', value: ov.deleted_images || 0 },
+      ].map(d => `<div style="flex:1;min-width:80px;background:#fff;border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);text-align:center">
+        <div style="font-size:22px;font-weight:700">${d.value}</div>
+        <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
+      </div>`).join('');
+
+      // 销毁旧图表
+      Object.values(statsCharts).forEach(c => c.destroy());
+      statsCharts = {};
+
+      if (!document.getElementById('chart-daily') || typeof Chart === 'undefined') {
+        console.warn('Chart.js 未加载，跳过图表');
+        return;
+      }
+
+      // 每日生成量折线图
+      const dailyLabels = (data.daily || []).map(r => r.day.slice(5));
+      const dailyData  = (data.daily || []).map(r => r.cnt);
+      const colors = ['#3b82f6','#ef4444','#f59e0b','#10b981','#8b5cf6','#ec4899','#06b6d4','#f97316','#84cc16','#6366f1'];
+
+      statsCharts.daily = new Chart(document.getElementById('chart-daily'), {
+        type: 'line',
+        data: {
+          labels: dailyLabels,
+          datasets: [{ label: '生成量', data: dailyData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.08)', fill: true, tension: 0.3, pointRadius: 2, pointHoverRadius: 5, pointBackgroundColor: '#3b82f6' }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      });
+
+      const userLabels = (data.users || []).map(r => r.username);
+      const userData   = (data.users || []).map(r => r.cnt);
+      statsCharts.users = new Chart(document.getElementById('chart-users'), {
+        type: 'bar',
+        data: {
+          labels: userLabels,
+          datasets: [{ label: '张数', data: userData, backgroundColor: colors, borderRadius: 4 }]
+        },
+        options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+      });
+
+      const modelLabels = (data.models || []).map(r => r.model);
+      const modelData   = (data.models || []).map(r => r.cnt);
+      statsCharts.models = new Chart(document.getElementById('chart-models'), {
+        type: 'doughnut',
+        data: {
+          labels: modelLabels,
+          datasets: [{ data: modelData, backgroundColor: colors }]
+        },
+        options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+      });
     }
 
     async function showRanking() {

@@ -115,6 +115,25 @@
     .theme-toggle .moon { display: none; }
     [data-theme="dark"] .theme-toggle .moon { display: block; }
 
+    /* ====== Toast 通知 ====== */
+    .toast-container {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 9999; display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      padding: 12px 24px; border-radius: 12px; font-size: 14px; font-weight: 500;
+      font-family: var(--font); white-space: nowrap;
+      animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards;
+      pointer-events: auto; backdrop-filter: blur(12px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .toast.success { background: rgba(22,163,74,0.9); color: #fff; }
+    .toast.error   { background: rgba(220,38,38,0.9); color: #fff; }
+    .toast.info    { background: rgba(37,99,235,0.9); color: #fff; }
+    @keyframes toastIn  { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes toastOut { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-12px); } }
+
     /* ====== Layout ====== */
     .app {
       max-width: 1240px;
@@ -965,6 +984,7 @@
 </head>
 
 <body>
+  <div class="toast-container" id="toast-container"></div>
   <div class="app">
     <!-- Hero -->
     <header class="hero">
@@ -1038,7 +1058,7 @@
         </div>
 
         <div class="status" id="status">请先登录后再生成图片</div>
-        <button class="btn" id="run" style="width:100%; margin-top:8px;">开始生图</button>
+        <button class="btn" id="run" style="width:100%; margin-top:8px;">发送请求</button>
       </div>
 
       <!-- 结果 & 历史（共享同一位置，互斥显示） -->
@@ -2349,6 +2369,14 @@
         if (type) statusEl.classList.add(type);
       }
 
+      function showToast(msg, type = 'info') {
+        const el = document.createElement('div');
+        el.className = 'toast ' + type;
+        el.textContent = msg;
+        document.getElementById('toast-container').appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+      }
+
       // 解析 API 错误并返回中文提示
       function parseApiError(errorMessage) {
         // 先尝试直接匹配英文错误消息并翻译
@@ -3527,7 +3555,8 @@ ${chinesePrompt}
             const formData = new FormData();
             formData.append('model', getImageModel());
             formData.append('prompt', prompt);
-            formData.append('size', getImageSize());
+            const imgSize = getImageSize();
+            if (imgSize !== 'auto') formData.append('size', imgSize);
             formData.append('n', '1');
             for (const img of imgs) {
               const resp = await fetch(img.dataUrl);
@@ -3539,12 +3568,13 @@ ${chinesePrompt}
             fetchBody = formData;
           } else {
             endpoint = getEndpoint();
+            const imgSize2 = getImageSize();
             const payload = {
               model: getImageModel(),
               prompt: prompt,
-              n: 1,
-              size: getImageSize()
+              n: 1
             };
+            if (imgSize2 !== 'auto') payload.size = imgSize2;
             fetchHeaders = { 'Content-Type': 'application/json' };
             fetchBody = JSON.stringify(payload);
           }
@@ -3581,7 +3611,7 @@ ${chinesePrompt}
 
         console.log('[callImageAPI] protocol:', protocol, 'endpoint:', endpoint, 'hasImages:', imgs.length > 0);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10分钟超时
+        const timeoutId = setTimeout(() => controller.abort(), 900000); // 15分钟超时
         let res;
         try {
           res = await fetch(endpoint, {
@@ -4039,6 +4069,7 @@ ${chinesePrompt}
           const elapsed = performance.now() - startTime;
           appendResult(result, { prompt, runtimeMs: elapsed });
           flashStatus(`基于图片生成完成！耗时 ${(elapsed / 1000).toFixed(2)}s`, 'success');
+          showToast('生成完成', 'success');
         } catch (err) {
           console.error('基于图片生成失败:', err);
           const errorMsg = parseApiError(err.message);
@@ -4076,7 +4107,7 @@ ${chinesePrompt}
         // 检查生成限制
         try {
           const check = await (await fetch('api/record.php?action=check')).json();
-          if (!check.can_generate) return flashStatus(check.reason, 'danger');
+          if (!check.can_generate) { flashStatus(check.reason, 'danger'); showToast(check.reason, 'error'); return; }
         } catch (_) {}
 
         const prompt = promptInput.value.trim();
@@ -4134,12 +4165,13 @@ ${chinesePrompt}
         }
         await Promise.all(promises);
 
-        // 显示完成状态（不显示总时间）
+        // 显示完成状态
         if (failed === 0) {
           flashStatus(`完成 ${completed} 张`, 'success');
+          showToast(`生成完成 · ${completed} 张`, 'success');
         } else {
-          // 显示失败原因的中文提示
           flashStatus(`失败 ${failed} 张: ${lastErrorMsg}`, 'danger');
+          showToast(`生成失败 · ${failed}/${completed + failed} 张`, 'error');
         }
         // 不需要重新启用按钮，因为从未禁用
         // runBtn.disabled = false;
@@ -4776,6 +4808,7 @@ ${chinesePrompt}
         // 任务完成
         const elapsed = ((Date.now() - taskInfo.startTime) / 1000).toFixed(1);
         updateTaskProgress(taskId, `✅ 全部完成！耗时 ${elapsed}s`);
+        showToast(`多角度生成完成 · ${elapsed}s`, 'success');
 
         // 3秒后移除任务
         setTimeout(() => {
@@ -5189,6 +5222,7 @@ ${chinesePrompt}
           updateAuthUI();
           closeAuthDialog();
           flashStatus(authMode === 'login' ? '登录成功' : '注册成功', 'success');
+          showToast(authMode === 'login' ? '登录成功' : '注册成功', 'success');
         } catch (err) {
           flashStatus('网络请求失败，请检查服务', 'danger');
           console.error('Auth error:', err);

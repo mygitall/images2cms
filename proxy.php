@@ -47,7 +47,8 @@ $method = $_SERVER['REQUEST_METHOD'];
 $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_HEADER, true);          // 返回响应头+体
-curl_setopt($ch, CURLOPT_TIMEOUT, 600);          // 10 分钟超时（生图较慢）
+curl_setopt($ch, CURLOPT_TIMEOUT, 900);          // 15 分钟超时（生图较慢）
+curl_setopt($ch, CURLOPT_ENCODING, '');           // 自动解压 gzip/deflate
 
 $headers = ['Authorization: Bearer ' . $apiKey];
 
@@ -98,11 +99,34 @@ if ($method === 'POST') {
 curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
 // ---- 执行请求 ----
-$response   = curl_exec($ch);
-$httpCode   = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$startTime = microtime(true);
+$response  = curl_exec($ch);
+$duration  = round((microtime(true) - $startTime) * 1000);
+$httpCode  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-$curlError  = curl_error($ch);
+$curlError = curl_error($ch);
 curl_close($ch);
+
+// ---- 记录日志 ----
+try {
+    require_once __DIR__ . '/db.php';
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $uid = $_SESSION['user']['id'] ?? null;
+    $isErr = ($curlError || $httpCode >= 400);
+    $stmt = $pdo->prepare(
+        'INSERT INTO api_logs (user_id, endpoint, method, status, http_code, duration_ms, error_msg)
+         VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
+    $stmt->execute([
+        $uid,
+        $targetPath,
+        $method,
+        $isErr ? 'error' : 'success',
+        $httpCode ?: 502,
+        $duration,
+        $curlError ?: ($isErr ? 'HTTP ' . $httpCode : null)
+    ]);
+} catch (Exception $e) { /* 日志记录失败不影响主流程 */ }
 
 if ($curlError) {
     http_response_code(502);

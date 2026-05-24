@@ -56,6 +56,23 @@ foreach (['daily_limit INT DEFAULT NULL', 'total_limit INT DEFAULT NULL'] as $co
 // gen_images 软删除字段
 try { $pdo->exec("ALTER TABLE `gen_images` ADD COLUMN `deleted_at` DATETIME DEFAULT NULL"); } catch (PDOException $e) {}
 
+// API 调用日志表
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS `api_logs` (
+    `id`          INT AUTO_INCREMENT PRIMARY KEY,
+    `user_id`     INT DEFAULT NULL,
+    `endpoint`    VARCHAR(255) NOT NULL,
+    `method`      VARCHAR(10) DEFAULT 'POST',
+    `status`      VARCHAR(20) DEFAULT 'success',
+    `http_code`   INT DEFAULT 200,
+    `duration_ms` INT DEFAULT 0,
+    `error_msg`   TEXT,
+    `created_at`  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_created` (`created_at`),
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // 创建默认管理员（admin / admin123）
 $stmt = $pdo->prepare('SELECT id FROM users WHERE username = ?');
 $stmt->execute(['admin']);
