@@ -2319,8 +2319,11 @@ if (file_exists(__DIR__ . '/config.php')) {
       // 清空历史按钮
       clearHistoryBtn.addEventListener('click', async () => {
         if (confirm('确定清空所有历史记录？此操作不可恢复。')) {
+          // 清空服务端记录（软删除）
+          try { await fetch('api/history.php?action=clear_all'); } catch (_) {}
           await clearAllHistory();
-          await renderHistory();
+          historyCountEl.textContent = '0 条';
+          historyGrid.innerHTML = '<div class="history-empty">暂无生成记录</div>';
           flashStatus('已清空历史记录', 'success');
         }
       });

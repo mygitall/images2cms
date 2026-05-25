@@ -17,6 +17,15 @@ if (!$user) {
     exit;
 }
 
+// ====== 清空全部（软删除）======
+if (($_GET['action'] ?? '') === 'clear_all') {
+    $pdo->prepare('UPDATE gen_images SET deleted_at = NOW() WHERE user_id = ? AND deleted_at IS NULL')
+        ->execute([$user['id']]);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => true], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 // ====== 软删除 ======
 if (($_GET['action'] ?? '') === 'delete') {
     $id = intval($_GET['id'] ?? 0);
@@ -38,7 +47,7 @@ $stmt->bindValue(':o',   $offset,     PDO::PARAM_INT);
 $stmt->execute();
 $list = $stmt->fetchAll();
 
-$total = $pdo->prepare('SELECT COUNT(*) FROM gen_images WHERE user_id = ?');
+$total = $pdo->prepare('SELECT COUNT(*) FROM gen_images WHERE user_id = ? AND deleted_at IS NULL');
 $total->execute([$user['id']]);
 $total = $total->fetchColumn();
 
