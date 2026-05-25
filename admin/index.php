@@ -108,6 +108,10 @@ $isAdmin = $user && $user['role'] === 'admin';
       font-size: 13px; font-family: var(--font); background: #fff; outline: none;
     }
     .inline-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+    .stat-row { display: flex; gap: 12px; flex-wrap: nowrap; overflow-x: auto; }
+    .stat-box { flex: 1; min-width: 100px; text-align: center; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 14px; }
+    .stat-box .num { font-size: 22px; font-weight: 700; }
+    .stat-box .label { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; }
 
     .msg {
       position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%);
@@ -168,21 +172,12 @@ $isAdmin = $user && $user['role'] === 'admin';
         </div>
       </div>
 
-      <!-- 生图 -->
-      <div class="card" id="admin-gen-card" style="margin-bottom:16px">
-        <h2>快速生图 <span style="font-weight:400;font-size:12px;color:var(--text-tertiary)">关闭浏览器也不中断，图片自动保存</span></h2>
-        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-          <textarea id="admin-prompt" placeholder="输入提示词..." style="flex:1;min-width:200px;resize:vertical;min-height:60px;padding:10px 14px;border:1px solid var(--card-border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;color:var(--text);background:var(--popup-bg)"></textarea>
-          <button class="btn" id="admin-gen-btn" style="flex-shrink:0">开始生图</button>
-        </div>
-        <div id="admin-gen-status" style="font-size:12px;color:var(--text-tertiary);margin-top:8px"></div>
-      </div>
-
       <div class="tabs">
         <button class="active" data-tab="images">图片记录</button>
         <button data-tab="users">用户管理</button>
         <button data-tab="stats">用量统计</button>
         <button data-tab="backup">数据备份</button>
+        <button data-tab="recharge">充值记录</button>
         <button data-tab="toggles">开关</button>
         <button data-tab="apilog">API 日志</button>
         <button data-tab="logs">操作记录</button>
@@ -201,13 +196,14 @@ $isAdmin = $user && $user['role'] === 'admin';
 
       <div class="card tab-content" id="tab-users" style="display:none">
         <h2>用户列表</h2>
-        <div class="inline-form" style="margin-bottom:16px">
+        <div class="inline-form" style="margin-bottom:16px;justify-content:space-between">
           <input id="new-username" placeholder="用户名"><input id="new-password" placeholder="密码" type="password">
           <select id="new-role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
           <button class="btn" onclick="createUser()">添加用户</button>
+          <input id="user-search" placeholder="搜索用户名..." style="width:200px" oninput="searchUsers()">
         </div>
-        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
-          <tbody id="users-tbody"><tr><td colspan="6" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody id="users-tbody"><tr><td colspan="7" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
       </div>
 
       <div class="card tab-content" id="tab-logs" style="display:none">
@@ -253,6 +249,13 @@ $isAdmin = $user && $user['role'] === 'admin';
       <div class="card tab-content" id="tab-toggles" style="display:none">
         <h2>前台功能开关</h2>
         <div id="toggles-container" style="display:flex;flex-direction:column;gap:8px">加载中...</div>
+      </div>
+
+      <div class="card tab-content" id="tab-recharge" style="display:none">
+        <h2>充值记录</h2>
+        <div class="stat-row" id="recharge-stats" style="margin-bottom:16px"></div>
+        <table><thead><tr><th>ID</th><th>用户</th><th>金额</th><th>说明</th><th>时间</th></tr></thead>
+          <tbody id="recharge-tbody"><tr><td colspan="5" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
       </div>
 
       <div class="card tab-content" id="tab-stats" style="display:none">
@@ -379,26 +382,6 @@ $isAdmin = $user && $user['role'] === 'admin';
     adminPanel.classList.add('active');
     document.getElementById('admin-username').textContent = '<?= htmlspecialchars($user['username']) ?> · 管理员';
 
-    // 后台生图
-    const adminGenBtn = document.getElementById('admin-gen-btn');
-    const adminPrompt = document.getElementById('admin-prompt');
-    const adminGenStatus = document.getElementById('admin-gen-status');
-    adminGenBtn.addEventListener('click', async () => {
-      const prompt = adminPrompt.value.trim();
-      if (!prompt) { adminGenStatus.textContent = '请输入提示词'; return; }
-      adminGenBtn.disabled = true; adminGenStatus.textContent = '生成中...';
-      const start = Date.now();
-      try {
-        const payload = { model: 'gpt-image-2', messages: [{ role: 'user', content: prompt }] };
-        const endpoint = '../proxy.php?path=' + encodeURIComponent('/v1/chat/completions');
-        const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-        if (!res.ok) { adminGenStatus.innerHTML = '<span style="color:var(--danger)">失败: ' + await res.text() + '</span>'; return; }
-        adminGenStatus.innerHTML = '<span style="color:var(--success)">完成</span> (' + ((Date.now()-start)/1000).toFixed(1) + 's) — 图片已自动保存';
-        setTimeout(() => loadImages(), 1500);
-      } catch (e) { adminGenStatus.innerHTML = '<span style="color:var(--danger)">错误: ' + e.message + '</span>'; }
-      finally { adminGenBtn.disabled = false; }
-    });
-
     loadImages();
     <?php endif; ?>
 
@@ -416,6 +399,7 @@ $isAdmin = $user && $user['role'] === 'admin';
         if (btn.dataset.tab === 'apilog') loadApiLogs();
         if (btn.dataset.tab === 'backup') loadBackups();
         if (btn.dataset.tab === 'toggles') loadToggles();
+        if (btn.dataset.tab === 'recharge') loadRecharge();
         if (btn.dataset.tab === 'config') loadConfig();
       });
     });
@@ -454,12 +438,15 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     // ====== 用户列表 ======
-    async function loadUsers() {
-      const res = await fetch('../api/admin.php?action=users');
+    function searchUsers() {
+      loadUsers(document.getElementById('user-search').value);
+    }
+    async function loadUsers(search = '') {
+      const res = await fetch('../api/admin.php?action=users' + (search ? '&search=' + encodeURIComponent(search) : ''));
       const list = await res.json();
       const tbody = document.getElementById('users-tbody');
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-tertiary)">暂无用户</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-tertiary)">暂无用户</td></tr>';
       } else {
         // 并行加载每个用户的最新操作
         const logs = await Promise.all(list.map(u =>
@@ -474,10 +461,13 @@ $isAdmin = $user && $user['role'] === 'admin';
           <tr>
             <td>${u.id}</td><td>${esc(u.username)}</td>
             <td>${u.role === 'admin' ? '管理员' : '用户'}</td>
+            <td style="font-size:11px;font-family:monospace">${esc(u.last_ip||'-')}</td>
             <td>${logText} <button class="btn-ghost" style="padding:1px 6px;font-size:10px;margin-left:4px" onclick="viewUserLogs(${u.id},'${esc(u.username)}')">查看全部</button></td>
             <td style="font-size:12px">${u.created_at||''}</td>
             <td>
-              <button class="btn-ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="openLimitDialog(${u.id},'${esc(u.username)}')">限制</button>
+              <button class="btn-ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="openTopupDialog(${u.id},'${esc(u.username)}')">充值</button>
+          <button class="btn-ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="openLimitDialog(${u.id},'${esc(u.username)}')">限制</button>
+          <button class="btn-ghost" style="padding:4px 8px;font-size:11px;margin-right:4px" onclick="resetUserPw(${u.id},'${esc(u.username)}')">改密</button>
               ${u.id !== currentUserId ? '<button class="btn-danger" style="padding:4px 10px;font-size:11px;border-radius:6px" onclick="deleteUser('+u.id+')">删除</button>' : ''}
             </td>
           </tr>`;
@@ -522,6 +512,28 @@ $isAdmin = $user && $user['role'] === 'admin';
       showMsg('用户已创建', 'ok'); loadUsers();
       document.getElementById('new-username').value = '';
       document.getElementById('new-password').value = '';
+    }
+
+    function resetUserPw(uid, username) {
+      var pw = prompt('为用户「'+username+'」设置新密码（至少4位）：');
+      if (!pw || pw.length < 4) { showMsg('密码至少4位', 'err'); return; }
+      fetch('../api/user_api.php?action=reset_pw', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({user_id:uid, new_password:pw})
+      }).then(r => r.json()).then(d => {
+        if (d.ok) showMsg('密码已重置为: '+pw, 'ok'); else showMsg(d.error||'失败','err');
+      });
+    }
+
+    function openTopupDialog(uid, username) {
+      var amount = prompt('为用户「'+username+'」充值金额（元）：', '1.00');
+      if (!amount || isNaN(parseFloat(amount))) return;
+      fetch('../api/user_api.php?action=topup', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({user_id:uid, amount:parseFloat(amount)})
+      }).then(r => r.json()).then(d => {
+        if (d.ok) showMsg('充值成功', 'ok'); else showMsg(d.error||'失败','err');
+      });
     }
 
     async function deleteUser(id) {
@@ -781,6 +793,23 @@ $isAdmin = $user && $user['role'] === 'admin';
         body: JSON.stringify({ key, value: val || '0' })
       });
       showMsg('已保存', 'ok'); loadToggles();
+    }
+
+    async function loadRecharge() {
+      const res = await fetch('../api/admin.php?action=recharge_logs');
+      const data = await res.json();
+      const list = data.list || [];
+      const s = data.summary || {};
+      document.getElementById('recharge-stats').innerHTML = [
+        { n:'¥'+parseFloat(s.total).toFixed(2), l:'累计充值' },
+        { n:'¥'+parseFloat(s.today).toFixed(2), l:'今日充值' },
+        { n:'¥'+parseFloat(s.week7).toFixed(2), l:'7天内' },
+        { n:'¥'+parseFloat(s.month30).toFixed(2), l:'30天内' },
+      ].map(d => '<div class="stat-box"><div class="num" style="font-size:22px;color:var(--success)">'+d.n+'</div><div class="label">'+d.l+'</div></div>').join('');
+      const tbody = document.getElementById('recharge-tbody');
+      tbody.innerHTML = list.length
+        ? list.map(r => `<tr><td>${r.id}</td><td>${esc(r.username)}</td><td style="color:var(--success);font-weight:500">+¥${parseFloat(r.amount).toFixed(2)}</td><td style="font-size:11px">${esc(r.reason||'')}</td><td style="font-size:11px">${r.created_at||''}</td></tr>`).join('')
+        : '<tr><td colspan="5" style="color:var(--text-tertiary)">暂无记录</td></tr>';
     }
 
     // ====== 统计仪表盘 ======

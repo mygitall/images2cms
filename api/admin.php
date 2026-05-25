@@ -37,7 +37,16 @@ function err($msg, $code = 400) { http_response_code($code); echo json_encode(['
 // ========== 用户管理 ==========
 if ($action === 'users') {
     if ($method === 'GET') {
-        $stmt = $pdo->query('SELECT id, username, role, created_at FROM users ORDER BY id');
+        $search = trim($_GET['search'] ?? '');
+        $sql = "SELECT u.id, u.username, u.role, u.created_at,
+                (SELECT l.ip FROM login_logs l WHERE l.user_id = u.id ORDER BY l.created_at DESC LIMIT 1) AS last_ip
+                FROM users u";
+        if ($search) {
+            $stmt = $pdo->prepare($sql . " WHERE u.username LIKE ? ORDER BY u.id");
+            $stmt->execute(['%' . $search . '%']);
+        } else {
+            $stmt = $pdo->query($sql . ' ORDER BY u.id');
+        }
         ok($stmt->fetchAll());
     }
 
@@ -214,6 +223,28 @@ if ($action === 'user_detail') {
         'today_logins'    => intval($todayLogins->fetchColumn()),
         'total_logins'    => intval($totalLogins->fetchColumn()),
     ]);
+}
+
+// ========== 充值记录 ==========
+if ($action === 'recharge_logs') {
+    $stmt = $pdo->query(
+        "SELECT b.*, u.username FROM balance_logs b
+         JOIN users u ON b.user_id = u.id
+         WHERE b.type = 'topup'
+         ORDER BY b.created_at DESC LIMIT 100"
+    );
+    $list = $stmt->fetchAll();
+
+    $summary = $pdo->query(
+        "SELECT
+            COALESCE(SUM(amount),0) AS total,
+            COALESCE(SUM(CASE WHEN DATE(created_at)=CURDATE() THEN amount ELSE 0 END),0) AS today,
+            COALESCE(SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN amount ELSE 0 END),0) AS week7,
+            COALESCE(SUM(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN amount ELSE 0 END),0) AS month30
+         FROM balance_logs WHERE type='topup'"
+    )->fetch();
+
+    ok(['list' => $list, 'summary' => $summary]);
 }
 
 // ========== 功能开关 ==========

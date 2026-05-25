@@ -185,6 +185,13 @@ if (file_exists(__DIR__ . '/config.php')) {
       border: 1px solid rgba(52,211,153,0.15);
     }
     .hero-left { flex: 1; min-width: 0; }
+    .hero-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex-shrink: 0; position: relative; }
+    .user-menu-btn { display: none; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--card-border); background: var(--card-bg); color: var(--text); cursor: pointer; font-size: 16px; align-items: center; justify-content: center; flex-shrink: 0; }
+    .user-dropdown { position: absolute; top: 100%; right: 0; margin-top: 6px; background: var(--popup-bg, #fff); border: 1px solid var(--card-border); border-radius: 12px; padding: 6px; min-width: 140px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; display: flex; flex-direction: column; gap: 2px; }
+    .user-dropdown button, .user-dropdown a { display: block; padding: 8px 14px; border: none; background: transparent; color: var(--text); font-size: 13px; font-family: var(--font); cursor: pointer; text-align: left; text-decoration: none; border-radius: 8px; }
+    .user-dropdown button:hover, .user-dropdown a:hover { background: var(--card-bg); }
+    @media (max-width: 900px) { .user-menu-btn { display: flex; } }
+    @media (min-width: 901px) { .user-dropdown { display: none !important; } }
 
     /* ====== Bento Grid ====== */
     .bento {
@@ -235,8 +242,9 @@ if (file_exists(__DIR__ . '/config.php')) {
 
     /* Button group (pill selection) */
     .btn-group {
-      display: flex; gap: 4px; flex-wrap: wrap;
+      display: flex; gap: 3px; flex-wrap: nowrap; overflow-x: auto;
     }
+    .btn-group button { flex-shrink: 0; }
     .btn-group button {
       padding: 6px 14px;
       border: 1px solid var(--card-border);
@@ -970,14 +978,17 @@ if (file_exists(__DIR__ . '/config.php')) {
       .card-presets, .card-results { grid-column: span 1; }
       .config-inline { flex-direction: column; gap: 8px; }
       .app { padding: 24px 16px 60px; }
-      .hero { margin-bottom: 24px; }
-      .hero h1 { font-size: 24px; }
+      .hero { margin-bottom: 24px; flex-direction: row; align-items: center; }
+      .hero h1 { font-size: 20px; }
+      .hero .sub { font-size: 12px; }
+      .hero .badge { font-size: 10px; padding: 2px 8px; }
       .results { grid-template-columns: 1fr; }
-      .history-grid { grid-template-columns: repeat(2, 1fr); }
+      .history-grid { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
       .config-row { flex-direction: column; }
       .config-row > * { min-width: 0; }
       .prompt-buttons-container { flex-direction: column; }
+      .theme-toggle { position: fixed; bottom: 80px; right: 16px; z-index: 100; box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
     }
 
     @media (min-width: 901px) and (max-width: 1100px) {
@@ -1004,13 +1015,21 @@ if (file_exists(__DIR__ . '/config.php')) {
         <p class="sub">文生图 / 图生图 · 参考图最多 4 张</p>
         <span class="badge">&#9702; API 已在后端配置</span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;">
+      <div class="hero-right">
         <span class="hero-user" id="hero-user" style="display:none;font-size:13px;color:var(--text-secondary)"></span>
         <button class="btn-ghost" id="changepw-btn" style="display:none;font-size:11px;">改密</button>
         <button class="btn-ghost" id="login-btn" style="font-size:12px;">登录</button>
         <button class="btn-ghost" id="logout-btn" style="display:none;font-size:12px;">退出</button>
+        <a class="btn-ghost" id="user-center-btn" href="user.php" style="display:none;font-size:12px;text-decoration:none;">个人中心</a>
         <a class="btn-ghost" id="admin-link" href="admin/" target="_blank" style="display:none;font-size:12px;text-decoration:none;">后台</a>
         <button class="theme-toggle" id="theme-toggle" title="切换深色/浅色模式">&#9788;</button>
+        <button class="user-menu-btn" id="user-menu-btn" style="display:none" title="用户菜单">&#128100;</button>
+        <div class="user-dropdown" id="user-dropdown" style="display:none">
+          <button id="menu-changepw">改密</button>
+          <a href="user.php">个人中心</a>
+          <a href="admin/" target="_blank" id="menu-admin">后台</a>
+          <button id="menu-logout">退出</button>
+        </div>
       </div>
     </header>
 
@@ -1672,7 +1691,18 @@ if (file_exists(__DIR__ . '/config.php')) {
           };
           img.onerror = () => {
             console.warn('缩略图加载失败，使用原图');
-            resolve(base64Src);
+            // 原图太大会拖慢历史加载，压缩到 200px
+            var fallbackImg = new Image();
+            fallbackImg.onload = function() {
+              var c2 = document.createElement('canvas');
+              var w2 = fallbackImg.width, h2 = fallbackImg.height;
+              if (w2 > 200) { h2 = h2 * 200 / w2; w2 = 200; }
+              c2.width = w2; c2.height = h2;
+              c2.getContext('2d').drawImage(fallbackImg, 0, 0, w2, h2);
+              try { resolve(c2.toDataURL('image/jpeg', 0.6)); } catch(e) { resolve(base64Src); }
+            };
+            fallbackImg.onerror = function() { resolve(base64Src); };
+            fallbackImg.src = base64Src;
           };
           img.src = src;
         });
@@ -3770,24 +3800,22 @@ ${chinesePrompt}
         card.dataset.startTime = performance.now();
 
         card.innerHTML = `
-          <div style="text-align: center; color: var(--muted);">
-            <div style="font-size: 48px; margin-bottom: 12px; animation: spin 2s linear infinite;">⏳</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text);">生成中 -大约2分钟完成#${index}</div>
-            <div class="card-timer" style="font-size: 12px; margin-top: 4px; color: var(--accent);">0.0s</div>
+          <div style="text-align:center;width:100%">
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:10px">生成中 #${index}</div>
+            <div style="height:4px;background:var(--card-border);border-radius:2px;overflow:hidden;margin:0 24px">
+              <div class="progress-fill" style="height:100%;width:0%;background:var(--text);border-radius:2px;transition:width 0.5s"></div>
+            </div>
+            <div class="card-timer" style="font-size:12px;margin-top:8px;color:var(--text-tertiary)">0.0s</div>
           </div>
-          <style>
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          </style>
         `;
 
-        // 启动计时器，每100ms更新一次
         const timerEl = card.querySelector('.card-timer');
+        const progressEl = card.querySelector('.progress-fill');
         const intervalId = setInterval(() => {
           const elapsed = ((performance.now() - card.dataset.startTime) / 1000).toFixed(1);
-          timerEl.textContent = `${elapsed}s`;
+          timerEl.textContent = `已等待 ${elapsed}s`;
+          const pct = Math.min(95, (elapsed / 120) * 100); // 2分钟满95%
+          if (progressEl) progressEl.style.width = pct + '%';
         }, 100);
 
         // 保存计时器ID，以便后续清理
@@ -4899,24 +4927,22 @@ ${chinesePrompt}
         card.dataset.startTime = performance.now();
 
         card.innerHTML = `
-          <div style="text-align: center; color: var(--muted);">
-            <div style="font-size: 48px; margin-bottom: 12px; animation: spin 2s linear infinite;">⏳</div>
-            <div style="font-size: 14px; font-weight: 600; color: var(--text);">${angleName}</div>
-            <div class="card-timer" style="font-size: 12px; margin-top: 4px; color: var(--accent);">0.0s</div>
+          <div style="text-align:center;width:100%">
+            <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px">${angleName}</div>
+            <div style="height:4px;background:var(--card-border);border-radius:2px;overflow:hidden;margin:0 20px">
+              <div class="progress-fill" style="height:100%;width:0%;background:var(--text);border-radius:2px;transition:width 0.5s"></div>
+            </div>
+            <div class="card-timer" style="font-size:12px;margin-top:6px;color:var(--text-tertiary)">0.0s</div>
           </div>
-          <style>
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          </style>
         `;
 
-        // 启动计时器，每100ms更新一次
         const timerEl = card.querySelector('.card-timer');
+        const progressEl = card.querySelector('.progress-fill');
         const intervalId = setInterval(() => {
           const elapsed = ((performance.now() - card.dataset.startTime) / 1000).toFixed(1);
-          timerEl.textContent = `${elapsed}s`;
+          timerEl.textContent = `已等待 ${elapsed}s`;
+          const pct = Math.min(95, (elapsed / 120) * 100);
+          if (progressEl) progressEl.style.width = pct + '%';
         }, 100);
 
         // 保存计时器ID，以便后续清理
@@ -5209,17 +5235,24 @@ ${chinesePrompt}
       let currentUser = null;
 
       function updateAuthUI() {
+        const isMobile = window.innerWidth <= 900;
         if (currentUser) {
-          heroUser.style.display = ''; heroUser.textContent = currentUser.username;
-          changepwBtn.style.display = ''; loginBtn.style.display = 'none'; logoutBtn.style.display = '';
-          if (currentUser.role === 'admin') { adminLink.style.display = ''; }
+          heroUser.style.display = '';
+          heroUser.textContent = currentUser.username;
+          changepwBtn.style.display = isMobile ? 'none' : '';
+          document.getElementById('user-center-btn').style.display = isMobile ? 'none' : '';
+          document.getElementById('user-menu-btn').style.display = isMobile ? 'flex' : 'none';
+          loginBtn.style.display = 'none'; logoutBtn.style.display = isMobile ? 'none' : '';
+          if (currentUser.role === 'admin') { adminLink.style.display = isMobile ? 'none' : ''; }
           if (statusEl.textContent === '请先登录后再生成图片') statusEl.textContent = '待发送...';
         } else {
-          heroUser.style.display = 'none'; changepwBtn.style.display = 'none'; loginBtn.style.display = '';
-          logoutBtn.style.display = 'none'; adminLink.style.display = 'none';
+          heroUser.style.display = 'none'; changepwBtn.style.display = 'none';
+          document.getElementById('user-center-btn').style.display = 'none';
+          document.getElementById('user-menu-btn').style.display = 'none';
+          loginBtn.style.display = ''; logoutBtn.style.display = 'none'; adminLink.style.display = 'none';
           statusEl.textContent = '请先登录后再生成图片';
         }
-        renderHistory(); // 切换用户时刷新历史
+        renderHistory();
       }
 
       function openAuthDialog(mode) {
@@ -5383,6 +5416,26 @@ ${chinesePrompt}
         document.getElementById('changepw-old').value = '';
         document.getElementById('changepw-new').value = '';
         showToast('密码已修改', 'success');
+      });
+
+      // 移动端用户菜单
+      const userMenuBtn = document.getElementById('user-menu-btn');
+      const userDropdown = document.getElementById('user-dropdown');
+      userMenuBtn.addEventListener('click', () => {
+        userDropdown.style.display = userDropdown.style.display === 'none' ? '' : 'none';
+      });
+      document.addEventListener('click', (e) => {
+        if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+          userDropdown.style.display = 'none';
+        }
+      });
+      document.getElementById('menu-changepw').addEventListener('click', () => {
+        userDropdown.style.display = 'none';
+        changepwBtn.click();
+      });
+      document.getElementById('menu-logout').addEventListener('click', () => {
+        userDropdown.style.display = 'none';
+        doLogout();
       });
 
       checkSession();

@@ -220,8 +220,23 @@ if ($uid && $isImageEndpoint && $httpCode >= 200 && $httpCode < 400 && !empty($r
                 }
             }
 
-            // 写入 MySQL 记录
+            // 扣余额（每张图 0.09 元）
             if ($saved && isset($pdo)) {
+                $cost = 0.09;
+                try {
+                    $bal = $pdo->prepare('SELECT balance FROM users WHERE id = ?');
+                    $bal->execute([$uid]);
+                    $current = floatval($bal->fetchColumn() ?: 0);
+                    if ($current >= $cost) {
+                        $newBal = $current - $cost;
+                        $pdo->prepare('UPDATE users SET balance = ? WHERE id = ?')->execute([$newBal, $uid]);
+                        $pdo->prepare('INSERT INTO balance_logs (user_id, amount, type, reason, balance_after) VALUES (?,?,?,?,?)')
+                            ->execute([$uid, $cost, 'deduct', '生成图片', $newBal]);
+                    }
+                } catch (\Throwable $e) {}
+
+            // 写入 MySQL 记录
+            if ($saved) {
                 $prompt = '';
                 if (!empty($data['choices'][0]['message']['content'])) {
                     $mc = $data['choices'][0]['message']['content'];
@@ -234,6 +249,7 @@ if ($uid && $isImageEndpoint && $httpCode >= 200 && $httpCode < 400 && !empty($r
 
                 $stmt2 = $pdo->prepare('INSERT INTO gen_images (user_id, filename, prompt, model) VALUES (?, ?, ?, ?)');
                 $stmt2->execute([$uid, $saveFilename, $prompt ?: '', '']);
+            }
             }
         }
     } catch (\Throwable $e) {

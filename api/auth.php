@@ -11,6 +11,20 @@ if (session_status() === PHP_SESSION_NONE) session_start();
 
 $action = $_GET['action'] ?? '';
 
+// ---- 频率限制（30秒内最多5次登录/注册）----
+if (in_array($action, ['login', 'register'])) {
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $cacheFile = sys_get_temp_dir() . '/rate_' . md5($ip . $action);
+    $now = time();
+    $attempts = @json_decode(@file_get_contents($cacheFile), true) ?: ['ts' => 0, 'count' => 0];
+    if ($now - $attempts['ts'] < 30 && $attempts['count'] >= 5) {
+        jsonOut(['error' => '操作太频繁，请30秒后再试'], 429);
+    }
+    if ($now - $attempts['ts'] >= 30) { $attempts = ['ts' => $now, 'count' => 1]; }
+    else { $attempts['count']++; }
+    @file_put_contents($cacheFile, json_encode($attempts));
+}
+
 // ---- JSON 输入 ----
 $input = json_decode(file_get_contents('php://input'), true) ?? [];
 

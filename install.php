@@ -99,6 +99,13 @@ if ($step >= 2 && $_SERVER['REQUEST_METHOD'] === 'POST') {
                 `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX `idx_created` (`created_at`)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+            $pdo->exec("CREATE TABLE IF NOT EXISTS `balance_logs` (
+                `id` INT AUTO_INCREMENT PRIMARY KEY, `user_id` INT NOT NULL,
+                `amount` DECIMAL(10,2) NOT NULL, `type` VARCHAR(20) DEFAULT 'deduct',
+                `reason` VARCHAR(255) DEFAULT '', `balance_after` DECIMAL(10,2) DEFAULT 0,
+                `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX `idx_user` (`user_id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
             // 兼容旧表：补全可能缺失的字段
             $fixCols = [
                 ['users',     'role',         "VARCHAR(10) DEFAULT 'user'"],
