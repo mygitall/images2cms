@@ -53,6 +53,9 @@ if (!empty($originalQuery)) {
 
 $method = $_SERVER['REQUEST_METHOD'];
 
+// 浏览器关闭后继续执行（不中断生图）
+ignore_user_abort(true);
+
 // ---- cURL 配置 ----
 $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -164,7 +167,6 @@ if ($uid && $isImageEndpoint && $httpCode >= 200 && $httpCode < 400 && !empty($r
     $saveFilename = '';
 
     try {
-        require_once __DIR__ . '/save.php'; // 复用 save.php 的路径逻辑
         $config = require __DIR__ . '/config.php';
         $saveDir = rtrim($config['save_dir'], '/');
         $username = $_SESSION['user']['username'] ?? '';
