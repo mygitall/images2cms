@@ -185,16 +185,36 @@ async function loadDashboard() {
   } catch(e) {}
 }
 
-async function loadLogs() {
+var logsPage = 1;
+
+async function loadLogs(page) {
+  logsPage = page || 1;
   try {
-    var res = await fetch('api/admin.php?action=api_logs&page=1');
+    var res = await fetch('api/user_api.php?action=my_logs&page=' + logsPage);
     var data = await res.json();
+    var list = data.list || [];
     var tbody = document.getElementById('logs-tbody');
-    if (!data.list || !data.list.length) {
+    if (!list.length) {
       tbody.innerHTML = '<tr><td colspan="4" style="color:var(--text3)">暂无记录</td></tr>';
     } else {
-      tbody.innerHTML = data.list.map(r => '<tr><td style="font-size:11px">'+(r.created_at||'').slice(5,16)+'</td><td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.endpoint||'').split('/').pop()+'</td><td style="font-size:11px">'+(r.duration_ms>1000?(r.duration_ms/1000).toFixed(1)+'s':r.duration_ms+'ms')+'</td><td style="font-size:11px;color:'+(r.status==='error'?'var(--danger)':'var(--success)')+'">'+(r.status==='error'?'失败':'成功')+'</td></tr>').join('');
+      tbody.innerHTML = list.map(r => '<tr><td style="font-size:11px">'+(r.created_at||'').slice(5,16)+'</td><td style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.endpoint||'').split('/').pop()+'</td><td style="font-size:11px">'+(r.duration_ms>1000?(r.duration_ms/1000).toFixed(1)+'s':r.duration_ms+'ms')+'</td><td style="font-size:11px;color:'+(r.status==='error'?'var(--danger)':'var(--success)')+'">'+(r.status==='error'?'失败':'成功')+'</td></tr>').join('');
     }
+    // 翻页
+    var pager = document.getElementById('logs-pager');
+    if (!pager) { pager = document.createElement('div'); pager.id = 'logs-pager'; pager.style.cssText = 'text-align:center;margin-top:12px'; tbody.parentElement.parentElement.appendChild(pager); }
+    var isMobile = window.innerWidth <= 768;
+    if (data.pages > 1) {
+      if (isMobile) {
+        pager.innerHTML = '<button class="btn" style="font-size:12px;padding:6px 20px" onclick="loadLogs('+(logsPage+1)+')">加载更多（'+(data.total - logsPage*15)+'条剩余）</button>';
+      } else {
+        var btns = '<button class="btn" style="font-size:11px;padding:4px 12px;margin:0 4px" '+(logsPage<=1?'disabled':'onclick="loadLogs('+(logsPage-1)+')"')+'>上一页</button>';
+        for (var p=1; p<=data.pages; p++) {
+          btns += '<button class="btn" style="font-size:11px;padding:4px 10px;margin:0 2px;'+(p===logsPage?'background:var(--text);color:var(--bg)':'background:transparent;color:var(--text);border:1px solid var(--card-border)')+'" onclick="loadLogs('+p+')">'+p+'</button>';
+        }
+        btns += '<button class="btn" style="font-size:11px;padding:4px 12px;margin:0 4px" '+(logsPage>=data.pages?'disabled':'onclick="loadLogs('+(logsPage+1)+')"')+'>下一页</button>';
+        pager.innerHTML = btns;
+      }
+    } else { pager.innerHTML = ''; }
   } catch(e) {}
 }
 

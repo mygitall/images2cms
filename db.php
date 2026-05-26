@@ -1,12 +1,11 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
+require_once __DIR__ . '/../api/_lib/helpers.php';
 
-$dbHost = 'localhost';
-$dbPort = '3306';
-$dbName = 'root';
-$dbUser = 'root';
-$dbPass = 'root';
+$dbHost = $_ENV['DB_HOST'] ?? 'localhost';
+$dbPort = $_ENV['DB_PORT'] ?? '3306';
+$dbName = $_ENV['DB_NAME'] ?? 'root';
+$dbUser = $_ENV['DB_USER'] ?? 'root';
+$dbPass = $_ENV['DB_PASS'] ?? 'root';
 
 try {
     if (!extension_loaded('pdo_mysql')) {

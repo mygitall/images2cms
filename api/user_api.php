@@ -77,11 +77,20 @@ if ($action === 'reset_pw') {
     exit;
 }
 
-// 当前用户的 API 调用日志
+// 当前用户的 API 调用日志（分页）
 if ($action === 'my_logs') {
-    $stmt = $pdo->prepare('SELECT endpoint, method, status, http_code, duration_ms, created_at FROM api_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50');
-    $stmt->execute([$user['id']]);
-    echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
+    $page  = max(1, intval($_GET['page'] ?? 1));
+    $limit = 15;
+    $offset = ($page - 1) * $limit;
+    $total = $pdo->prepare('SELECT COUNT(*) FROM api_logs WHERE user_id = ?');
+    $total->execute([$user['id']]);
+    $total = $total->fetchColumn();
+    $stmt = $pdo->prepare('SELECT endpoint, method, status, http_code, duration_ms, created_at FROM api_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?');
+    $stmt->bindValue(1, $user['id'], PDO::PARAM_INT);
+    $stmt->bindValue(2, $limit, PDO::PARAM_INT);
+    $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    echo json_encode(['list' => $stmt->fetchAll(), 'total' => intval($total), 'page' => $page, 'pages' => ceil($total / $limit)], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
