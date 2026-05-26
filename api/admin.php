@@ -38,7 +38,7 @@ function err($msg, $code = 400) { http_response_code($code); echo json_encode(['
 if ($action === 'users') {
     if ($method === 'GET') {
         $search = trim($_GET['search'] ?? '');
-        $sql = "SELECT u.id, u.username, u.role, u.created_at,
+        $sql = "SELECT u.id, u.username, u.role, u.balance, u.created_at,
                 (SELECT l.ip FROM login_logs l WHERE l.user_id = u.id ORDER BY l.created_at DESC LIMIT 1) AS last_ip
                 FROM users u";
         if ($search) {

@@ -219,7 +219,6 @@ if (file_exists(__DIR__ . '/config.php')) {
     .card-settings    { grid-column: span 2; }
     .card-results     { grid-column: span 2; }
     .card-history     { grid-column: span 2; margin-top: 4px; }
-    .card-upload      { grid-column: span 3; }
     .card-config      { grid-column: span 3; }
     .card-folder      { grid-column: span 2; }
     .card-presets     { grid-column: span 4; margin-top: 4px; }
@@ -974,7 +973,7 @@ if (file_exists(__DIR__ . '/config.php')) {
     @media (max-width: 900px) {
       .bento { grid-template-columns: 1fr; gap: 10px; }
       .card-prompt, .card-settings, .card-history,
-      .card-upload, .card-config, .card-folder,
+      .card-config, .card-folder,
       .card-presets, .card-results { grid-column: span 1; }
       .config-inline { flex-direction: column; gap: 8px; }
       .app { padding: 24px 16px 60px; }
@@ -1065,14 +1064,27 @@ if (file_exists(__DIR__ . '/config.php')) {
 
     <!-- Bento Grid -->
     <div class="bento">
-      <!-- 提示词 -->
-      <div class="glass-card card-prompt">
-        <label for="prompt">提示词（必填）</label>
+      <!-- 提示词 / 上传参考图（共享区域，切换显示） -->
+      <div class="glass-card card-prompt" id="prompt-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label for="prompt" style="margin-bottom:0">提示词（必填）</label>
+          <button class="btn-mini" id="switch-upload-btn">上传参考图</button>
+        </div>
         <textarea id="prompt" placeholder="例如：女生坐在口播室，柔和光线，电影感"></textarea>
         <div class="prompt-buttons-container">
           <button class="save-prompt-from-input-btn" id="save-prompt-from-input">保存到提示词库</button>
           <button class="optimize-prompt-btn" id="optimize-prompt-btn">AI 优化提示词</button>
         </div>
+      </div>
+
+      <div class="glass-card card-prompt" id="upload-card" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <label style="margin-bottom:0">上传参考图（最多 4 张 · 拖拽/粘贴）</label>
+          <button class="btn-mini" id="switch-prompt-btn">返回提示词</button>
+        </div>
+        <input id="image-upload" type="file" accept="image/png,image/jpeg" multiple style="margin-bottom:8px;">
+        <div class="uploads" id="upload-preview"></div>
+        <textarea id="prompt-upload" placeholder="输入提示词..." style="margin-top:10px;min-height:80px"></textarea>
       </div>
 
       <!-- 参数 & 生成 -->
@@ -1128,13 +1140,6 @@ if (file_exists(__DIR__ . '/config.php')) {
             <div class="history-empty">暂无历史记录</div>
           </div>
         </div>
-      </div>
-
-      <!-- 上传参考图 -->
-      <div class="glass-card card-upload">
-        <label for="image">上传参考图（最多 4 张 · 拖拽/粘贴）</label>
-        <input id="image" type="file" accept="image/png,image/jpeg" multiple style="margin-bottom:8px;">
-        <div class="uploads" id="upload-preview"></div>
       </div>
 
       <!-- 模型 & 协议 -->
@@ -1312,7 +1317,7 @@ if (file_exists(__DIR__ . '/config.php')) {
       }
 
       const promptInput = document.getElementById('prompt');
-      const fileInput = document.getElementById('image');
+      const fileInput = document.getElementById('image-upload');
       const aspectSelect = document.getElementById('aspect');
       const resolutionSelect = document.getElementById('resolution');
       const countInput = document.getElementById('count');
@@ -2605,8 +2610,8 @@ if (file_exists(__DIR__ . '/config.php')) {
       }
 
       // 图片大小限制（字节）
-      const MIN_IMAGE_SIZE = 5 * 1024 * 1024; // 最小目标：5MB
-      const MAX_IMAGE_SIZE = 9 * 1024 * 1024; // 最大目标：9MB
+      const MIN_IMAGE_SIZE = 1 * 1024 * 1024; // 最小目标：1MB
+      const MAX_IMAGE_SIZE = 2 * 1024 * 1024; // 最大目标：2MB
 
       // 压缩图片到指定尺寸和质量
       function compressImageOnce(img, maxWidth, maxHeight, quality, mime) {
@@ -2683,27 +2688,10 @@ if (file_exists(__DIR__ . '/config.php')) {
 
             // 尝试高质量JPEG（从1.0开始，逐步降低，增加细粒度）
             compressionLevels.push(
-              [originalWidth, originalHeight, 1.00, 'image/jpeg'],  // 最高质量
-              [originalWidth, originalHeight, 0.99, 'image/jpeg'],  // 极高质量
-              [originalWidth, originalHeight, 0.98, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.97, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.96, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.95, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.93, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.90, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.87, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.85, 'image/jpeg'],
-              [originalWidth, originalHeight, 0.80, 'image/jpeg'],
-              [4096, 4096, 0.92, 'image/jpeg'],  // 开始缩放尺寸
-              [3072, 3072, 0.85, 'image/jpeg'],
-              [2560, 2560, 0.80, 'image/jpeg'],
-              [2048, 2048, 0.75, 'image/jpeg'],
-              [1920, 1920, 0.70, 'image/jpeg'],
-              [1600, 1600, 0.65, 'image/jpeg'],
-              [1280, 1280, 0.60, 'image/jpeg'],
-              [1024, 1024, 0.55, 'image/jpeg'],
-              [800, 800, 0.50, 'image/jpeg'],
-              [640, 640, 0.45, 'image/jpeg']
+              [2048, 2048, 0.85, 'image/jpeg'],
+              [1600, 1600, 0.75, 'image/jpeg'],
+              [1200, 1200, 0.65, 'image/jpeg'],
+              [800, 800, 0.55, 'image/jpeg']
             );
 
             let result = null;
@@ -4168,10 +4156,16 @@ ${chinesePrompt}
       async function handleRun() {
         if (!currentUser) return flashStatus('请先登录后再生成图片', 'danger');
 
-        // 检查生成限制
+        // 检查生成限制 + 余额
         try {
           const check = await (await fetch('api/record.php?action=check')).json();
           if (!check.can_generate) { flashStatus(check.reason, 'danger'); showToast(check.reason, 'error'); return; }
+          const balResp = await fetch('api/user_api.php?action=balance');
+          const bal = await balResp.json();
+          if (bal.balance !== undefined && bal.balance < 0.09) {
+            flashStatus('余额不足（剩余 ¥' + bal.balance.toFixed(2) + '，每次扣 ¥0.09）', 'danger');
+            showToast('余额不足，请联系管理员充值', 'error'); return;
+          }
         } catch (_) {}
 
         const prompt = promptInput.value.trim();
@@ -5441,6 +5435,21 @@ ${chinesePrompt}
         doLogout();
       });
 
+      // 提示词 / 上传参考图切换
+      const promptUpload = document.getElementById('prompt-upload');
+      document.getElementById('switch-upload-btn').addEventListener('click', () => {
+        document.getElementById('prompt-card').style.display = 'none';
+        document.getElementById('upload-card').style.display = '';
+        promptUpload.value = promptInput.value;
+      });
+      document.getElementById('switch-prompt-btn').addEventListener('click', () => {
+        promptInput.value = promptUpload.value;
+        document.getElementById('upload-card').style.display = 'none';
+        document.getElementById('prompt-card').style.display = '';
+      });
+      // 双向同步 textarea
+      promptInput.addEventListener('input', () => { promptUpload.value = promptInput.value; });
+      promptUpload.addEventListener('input', () => { promptInput.value = promptUpload.value; });
       checkSession();
 
       // ====== 主题切换 ======

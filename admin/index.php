@@ -94,7 +94,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: rgba(0,0,0,0.03); border-radius: 10px; padding: 4px; width: fit-content; }
     .tabs button { padding: 8px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: var(--font); background: transparent; color: var(--text-tertiary); }
-    .tabs button.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .tabs button.active { background: var(--popup-bg); color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
     .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; padding: 24px; margin-bottom: 16px; }
     .card h2 { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
@@ -105,7 +105,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     input:not(.login-box input), select {
       padding: 8px 12px; border: 1px solid var(--card-border); border-radius: 8px;
-      font-size: 13px; font-family: var(--font); background: #fff; outline: none;
+      font-size: 13px; font-family: var(--font); background: var(--popup-bg); outline: none;
     }
     .inline-form { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
     .stat-row { display: flex; gap: 12px; flex-wrap: nowrap; overflow-x: auto; }
@@ -131,7 +131,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     /* Dialog */
     .dialog-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 9998; align-items: center; justify-content: center; }
-    .dialog-content { background: #fff; border: 1px solid var(--card-border); border-radius: 16px; padding: 28px; max-width: 400px; width: 90%; }
+    .dialog-content { background: var(--popup-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 28px; max-width: 400px; width: 90%; }
     .dialog-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
     .dialog-input { width: 100%; padding: 10px 14px; border: 1px solid var(--card-border); border-radius: 10px; font-size: 14px; font-family: var(--font); margin-bottom: 12px; outline: none; }
     .dialog-input:focus { border-color: rgba(0,0,0,0.2); }
@@ -202,8 +202,8 @@ $isAdmin = $user && $user['role'] === 'admin';
           <button class="btn" onclick="createUser()">添加用户</button>
           <input id="user-search" placeholder="搜索用户名..." style="width:200px" oninput="searchUsers()">
         </div>
-        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
-          <tbody id="users-tbody"><tr><td colspan="7" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>余额</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody id="users-tbody"><tr><td colspan="8" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
       </div>
 
       <div class="card tab-content" id="tab-logs" style="display:none">
@@ -446,7 +446,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const list = await res.json();
       const tbody = document.getElementById('users-tbody');
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-tertiary)">暂无用户</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-tertiary)">暂无用户</td></tr>';
       } else {
         // 并行加载每个用户的最新操作
         const logs = await Promise.all(list.map(u =>
@@ -461,6 +461,7 @@ $isAdmin = $user && $user['role'] === 'admin';
           <tr>
             <td>${u.id}</td><td>${esc(u.username)}</td>
             <td>${u.role === 'admin' ? '管理员' : '用户'}</td>
+            <td style="cursor:pointer;color:var(--success);font-weight:500" onclick="editBalance(${u.id},'${esc(u.username)}',${parseFloat(u.balance||0).toFixed(2)})" title="点击修改余额">¥${parseFloat(u.balance||0).toFixed(2)}</td>
             <td style="font-size:11px;font-family:monospace">${esc(u.last_ip||'-')}</td>
             <td>${logText} <button class="btn-ghost" style="padding:1px 6px;font-size:10px;margin-left:4px" onclick="viewUserLogs(${u.id},'${esc(u.username)}')">查看全部</button></td>
             <td style="font-size:12px">${u.created_at||''}</td>
@@ -512,6 +513,18 @@ $isAdmin = $user && $user['role'] === 'admin';
       showMsg('用户已创建', 'ok'); loadUsers();
       document.getElementById('new-username').value = '';
       document.getElementById('new-password').value = '';
+    }
+
+    function editBalance(uid, username, current) {
+      var val = prompt('修改「'+username+'」的余额（当前 ¥'+current.toFixed(2)+'）：', current.toFixed(2));
+      if (val === null || isNaN(parseFloat(val))) return;
+      fetch('../api/user_api.php?action=set_balance', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({user_id:uid, balance:parseFloat(val), reason:'管理员手动调整'})
+      }).then(r => r.json()).then(d => {
+        if (d.ok) showMsg('余额已更新为 ¥'+d.balance.toFixed(2), 'ok'), loadUsers();
+        else showMsg(d.error||'失败','err');
+      });
     }
 
     function resetUserPw(uid, username) {

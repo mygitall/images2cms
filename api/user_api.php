@@ -77,4 +77,39 @@ if ($action === 'reset_pw') {
     exit;
 }
 
+// 当前用户的 API 调用日志
+if ($action === 'my_logs') {
+    $stmt = $pdo->prepare('SELECT endpoint, method, status, http_code, duration_ms, created_at FROM api_logs WHERE user_id = ? ORDER BY created_at DESC LIMIT 50');
+    $stmt->execute([$user['id']]);
+    echo json_encode($stmt->fetchAll(), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// 管理员直接修改余额
+if ($action === 'set_balance') {
+    if ($user['role'] !== 'admin') { echo json_encode(['error'=>'需要管理员权限']); exit; }
+    $input = json_decode(file_get_contents('php://input'), true) ?? [];
+    $uid = intval($input['user_id'] ?? 0);
+    $newBal = floatval($input['balance'] ?? 0);
+    $reason = $input['reason'] ?? '管理员手动调整';
+    if ($uid <= 0) { echo json_encode(['error'=>'参数错误']); exit; }
+
+    $pdo->beginTransaction();
+    try {
+        $st = $pdo->prepare('SELECT balance FROM users WHERE id = ? FOR UPDATE');
+        $st->execute([$uid]);
+        $oldBal = floatval($st->fetchColumn() ?: 0);
+        $pdo->prepare('UPDATE users SET balance = ? WHERE id = ?')->execute([$newBal, $uid]);
+        $diff = $newBal - $oldBal;
+        $pdo->prepare('INSERT INTO balance_logs (user_id, amount, type, reason, balance_after) VALUES (?,?,?,?,?)')
+            ->execute([$uid, abs($diff), $diff >= 0 ? 'topup' : 'deduct', $reason, $newBal]);
+        $pdo->commit();
+        echo json_encode(['ok'=>true, 'balance'=>$newBal]);
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        echo json_encode(['error'=>$e->getMessage()]);
+    }
+    exit;
+}
+
 echo json_encode(['error' => '未知 action']);

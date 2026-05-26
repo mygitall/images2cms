@@ -168,7 +168,7 @@ async function loadDashboard() {
     var res = await fetch('api/history.php?page=1');
     var data = await res.json();
     var total = data.total || 0;
-    var res2 = await fetch('api/admin.php?action=api_logs&page=1');
+    var res2 = await fetch('api/user_api.php?action=my_logs');
     var logData = await res2.json();
     var todayLogs = 0, avgDuration = 0;
     if (logData.list) {
