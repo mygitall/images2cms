@@ -74,10 +74,11 @@ if ($action === 'delete_all') {
         echo json_encode(['error' => '需要确认参数'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    $pdo->exec('DELETE FROM gen_images');
-    $pdo->exec('DELETE FROM login_logs');
-    $pdo->exec('DELETE FROM api_logs');
-    $pdo->exec('DELETE FROM users');
+    // 清空全部 8 张表
+    $allTables = ['gen_images','users','login_logs','api_logs','balance_logs','case_favorites','page_visits','admin_audit'];
+    foreach ($allTables as $t) {
+        try { $pdo->exec("DELETE FROM `{$t}`"); } catch (\Throwable $e) {}
+    }
     // 重建默认管理员
     $pdo->prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)')
         ->execute(['admin', password_hash('admin123', PASSWORD_BCRYPT), 'admin']);
@@ -86,7 +87,7 @@ if ($action === 'delete_all') {
     exit;
 }
 
-// ====== 导入 JSON 数据 ======
+// ====== 导入 JSON 数据（完整迁移：先清空再导入） ======
 if ($action === 'import') {
     $file = $_FILES['file'] ?? null;
     if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
@@ -102,6 +103,7 @@ if ($action === 'import') {
     }
 
     $imported = 0;
+    $errors = [];
 
     // 支持完整备份或单表备份
     $data = isset($json['gen_images']) ? $json : ['gen_images' => $json];
@@ -112,21 +114,42 @@ if ($action === 'import') {
         'balance_logs' => 'balance_logs', 'case_favorites' => 'case_favorites',
         'page_visits' => 'page_visits', 'admin_audit' => 'admin_audit'
     ];
-    foreach ($tableMap as $key => $table) {
-        if (!empty($data[$key]) && is_array($data[$key])) {
-            foreach ($data[$key] as $row) {
-                if (!is_array($row)) continue;
-                $cols = array_keys($row);
-                $vals = array_values($row);
-                $placeholders = implode(',', array_fill(0, count($cols), '?'));
-                $colNames = '`' . implode('`,`', $cols) . '`';
-                try {
-                    $stmt = $pdo->prepare("INSERT IGNORE INTO `{$table}` ({$colNames}) VALUES ({$placeholders})");
-                    $stmt->execute($vals);
-                    $imported++;
-                } catch (Exception $e) {}
+
+    $pdo->beginTransaction();
+    try {
+        // 先清空有数据的表
+        foreach ($tableMap as $key => $table) {
+            if (!empty($data[$key]) && is_array($data[$key])) {
+                try { $pdo->exec("DELETE FROM `{$table}`"); } catch (\Throwable $e) {}
             }
         }
+
+        // 逐行导入，保留原始 ID
+        foreach ($tableMap as $key => $table) {
+            if (!empty($data[$key]) && is_array($data[$key])) {
+                foreach ($data[$key] as $row) {
+                    if (!is_array($row)) continue;
+                    $cols = array_keys($row);
+                    $vals = array_values($row);
+                    $placeholders = implode(',', array_fill(0, count($cols), '?'));
+                    $colNames = '`' . implode('`,`', $cols) . '`';
+                    try {
+                        $stmt = $pdo->prepare("INSERT INTO `{$table}` ({$colNames}) VALUES ({$placeholders})");
+                        $stmt->execute($vals);
+                        $imported++;
+                    } catch (\Throwable $e) {
+                        $errors[] = "{$table} 行导入失败: " . $e->getMessage();
+                    }
+                }
+            }
+        }
+
+        $pdo->commit();
+    } catch (\Throwable $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => '导入失败: ' . $e->getMessage(), 'errors' => $errors], JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     // 导入 config
@@ -136,7 +159,7 @@ if ($action === 'import') {
     }
 
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => true, 'imported' => $imported], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
