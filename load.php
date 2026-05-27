@@ -28,9 +28,9 @@ if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $file)) {
 // 查用户子目录（兼容主 app 和 images20 两种 uploads 路径）
 $found = false;
 if (!empty($user) && preg_match('/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}\-]+$/u', $user)) {
-    // 主 app 的 uploads 路径
-    $mainUploads = dirname($saveDir) . '/htdocs/uploads/' . $user . '/' . $file;
-    // images20 自己的 uploads
+    // 主 app 的 uploads 路径: /htdocs/uploads/{user}/
+    $mainUploads = __DIR__ . '/../uploads/' . $user . '/' . $file;
+    // images20 的 save_dir 子目录
     $img20Uploads = $saveDir . '/' . $user . '/' . $file;
     foreach ([$mainUploads, $img20Uploads] as $fp) {
         if (file_exists($fp)) { $filePath = $fp; $found = true; break; }
