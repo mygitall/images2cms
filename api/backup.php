@@ -63,47 +63,62 @@ if ($action === 'import') {
 
     $file = $_FILES['file'] ?? null;
     if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
-        http_response_code(400);
-        echo json_encode(['error' => '请上传 SQL 文件'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $sql = file_get_contents($file['tmp_name']);
-    if (!$sql) {
-        http_response_code(400);
-        echo json_encode(['error' => '文件为空'], JSON_UNESCAPED_UNICODE);
-        exit;
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode(['error' => '请上传 SQL 文件']));
     }
 
     $imported = 0;
     $errors = [];
+    $configJson = '';
+    $envJson = '';
 
-    // 按行流式解析：遇到 INSERT 语句直接执行，不等所有行读完
-    $lines = explode("\n", $sql);
+    $handle = @fopen($file['tmp_name'], 'r');
+    if (!$handle) {
+        header('Content-Type: application/json; charset=utf-8');
+        die(json_encode(['error' => '无法打开文件']));
+    }
+
     $current = '';
-    $insertCount = 0;
-
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
     $pdo->beginTransaction();
+
     try {
-        foreach ($lines as $line) {
+        while (($line = fgets($handle)) !== false) {
             $trimmed = trim($line);
-            if ($trimmed === '' || $trimmed[0] === '-' || substr($trimmed, 0, 2) === '/*') continue;
+            if ($trimmed === '' || $trimmed[0] === '-') continue;
 
-            $current .= $line . "\n";
+            // 收集 __CONFIG__ / __ENV__ 块
+            if (preg_match('/\/\*__(CONFIG|ENV)__\*\//', $trimmed, $tagMatch)) {
+                $tag = $tagMatch[1];
+                $block = '';
+                while (($inner = fgets($handle)) !== false) {
+                    if (strpos($inner, "/*__END{$tag}__*/") !== false) break;
+                    $block .= $inner;
+                }
+                if ($tag === 'CONFIG') $configJson = $block;
+                if ($tag === 'ENV') $envJson = $block;
+                continue;
+            }
 
-            // 检测完整 SQL 语句（以分号结尾）
-            if (substr(rtrim($current), -1) === ';') {
+            $current .= $trimmed . ' ';
+
+            // 分号结尾 → 执行
+            if (substr($trimmed, -1) === ';') {
                 $stmt = trim($current);
                 $current = '';
-
                 $upper6 = strtoupper(substr($stmt, 0, 6));
+
                 if ($upper6 === 'INSERT') {
                     try {
                         $pdo->exec($stmt);
-                        $insertCount++;
-                        $imported = $insertCount;
+                        $imported++;
+                        // 每 100 条提交一次，避免事务过大
+                        if ($imported % 100 === 0) {
+                            $pdo->commit();
+                            $pdo->beginTransaction();
+                        }
                     } catch (\Throwable $e) {
-                        $errors[] = substr($stmt, 0, 80) . '... — ' . $e->getMessage();
+                        $errors[] = substr($stmt, 0, 80) . ': ' . $e->getMessage();
                     }
                 } elseif (preg_match('/^(DROP|CREATE|TRUNCATE|SET\s+FOREIGN|SET\s+NAMES)/i', $stmt)) {
                     try { $pdo->exec($stmt); } catch (\Throwable $e) {}
@@ -111,30 +126,27 @@ if ($action === 'import') {
             }
         }
 
-        // 处理最后未结束的语句
-        $stmt = trim($current);
-        if (!empty($stmt)) {
-            $upper6 = strtoupper(substr($stmt, 0, 6));
-            if ($upper6 === 'INSERT') {
-                try { $pdo->exec($stmt); $imported++; } catch (\Throwable $e) {}
-            }
-        }
-
+        fclose($handle);
         $pdo->commit();
     } catch (\Throwable $e) {
         $pdo->rollBack();
+        if (is_resource($handle)) fclose($handle);
     }
 
-    // 处理 __CONFIG__ 和 __ENV__
-    if (preg_match('/\/\*__CONFIG__\*\/(.*?)\/\*__ENDCONFIG__\*\//s', $sql, $m)) {
-        $cfg = json_decode($m[1], true);
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+
+    // 恢复 config
+    if ($configJson) {
+        $cfg = json_decode($configJson, true);
         if ($cfg) {
             $export = var_export($cfg, true);
             file_put_contents(__DIR__ . '/../config.php', "<?php\nreturn {$export};\n");
         }
     }
-    if (preg_match('/\/\*__ENV__\*\/(.*?)\/\*__ENDENV__\*\//s', $sql, $m)) {
-        $envData = json_decode($m[1], true);
+
+    // 恢复 env
+    if ($envJson) {
+        $envData = json_decode($envJson, true);
         if ($envData && !empty($envData['keys'])) {
             $envFile = __DIR__ . '/../../.env';
             if (file_exists($envFile)) {
@@ -148,8 +160,7 @@ if ($action === 'import') {
     }
 
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors], JSON_UNESCAPED_UNICODE);
-    exit;
+    die(json_encode(['ok' => true, 'imported' => $imported, 'errors' => $errors], JSON_UNESCAPED_UNICODE));
 }
 
 // ====== 删除所有数据 ======
