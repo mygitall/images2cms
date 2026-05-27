@@ -771,6 +771,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       daily_reg_limit:   { label: '每日注册上限', desc: '每天最多注册数（0=不限）', hasInput: true, inputKey: 'daily_reg_max', inputPlaceholder: '0', isNumber: true },
       global_daily_limit:{ label: '全局每日生图上限', desc: '所有用户每天合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_daily_max', inputPlaceholder: '0', isNumber: true },
       global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
+      new_user_free:    { label: '新用户免费生图数', desc: '注册后每人可免费生图次数（默认1）', hasInput: true, inputKey: 'new_user_free_count', inputPlaceholder: '1', isNumber: true },
     };
     async function loadToggles() {
       const res = await fetch('../api/admin.php?action=features');
