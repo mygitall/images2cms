@@ -6,7 +6,7 @@ if (file_exists(__DIR__ . '/../config.php')) {
     header('Location: ../install.php'); exit;
 }
 session_start();
-$user = $_SESSION['user'] ?? null;
+$user = $_SESSION['admin'] ?? $_SESSION['user'] ?? null;
 $isAdmin = $user && $user['role'] === 'admin';
 ?><!doctype html>
 <html lang="zh">

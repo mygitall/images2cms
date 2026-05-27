@@ -95,6 +95,10 @@ if ($action === 'login') {
     }
 
     $_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'role' => $user['role']];
+    // 管理员独立会话，避免被前台用户登录挤掉
+    if ($user['role'] === 'admin') {
+        $_SESSION['admin'] = $_SESSION['user'];
+    }
 
     // 记录登录日志（优先获取公网 IP）
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';
