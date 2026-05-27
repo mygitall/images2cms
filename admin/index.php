@@ -229,12 +229,16 @@ $isAdmin = $user && $user['role'] === 'admin';
 
       <div class="card tab-content" id="tab-users" style="display:none">
         <h2>用户列表</h2>
-        <form class="inline-form" style="margin-bottom:16px;justify-content:space-between" onsubmit="createUser();return false">
+        <div class="inline-form" style="margin-bottom:12px;justify-content:space-between">
+          <form onsubmit="createUser();return false" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
           <input id="new-username" placeholder="用户名" autocomplete="off"><input id="new-password" placeholder="密码" type="password" autocomplete="new-password">
           <select id="new-role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
           <button class="btn" type="submit">添加用户</button>
+          </form>
+          <div style="display:flex;gap:8px;align-items:center">
           <input id="user-search" placeholder="搜索用户名..." style="width:200px" oninput="searchUsers()">
-          <button class="btn" onclick="openBatchTopup()" style="font-size:12px;padding:8px 14px">批量加积分</button>
+          <button class="btn" onclick="openBatchTopup()" style="font-size:12px;padding:8px 14px;white-space:nowrap">批量加积分</button>
+          </div>
         </div>
         <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>余额</th><th>备注</th><th>最近生图</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
           <tbody id="users-tbody"><tr><td colspan="10" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
