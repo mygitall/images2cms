@@ -5390,24 +5390,26 @@ ${chinesePrompt}
             const el = document.querySelector('.card-presets');
             if (el) el.style.display = 'none';
           }
-          // 网站公告弹窗
-          if (features.site_announcement !== false && features.site_announcement !== 'false') {
+        } catch (_) {}
+
+        // 网站公告弹窗（try 外，确保错误可见）
+        try {
+          if (features.site_announcement && features.site_announcement !== 'false') {
             var text = features.site_announcement_text || '';
             if (text) {
-              var key = 'ann_' + text.length;
-              for (var i = 0; i < Math.min(text.length, 5); i++) key += '_' + text.charCodeAt(i);
+              var key = 'ann_' + text.length + '_' + text.charCodeAt(0);
               if (localStorage.getItem(key) !== '1') {
                 var o = document.createElement('div');
                 o.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
-                o.innerHTML = '<div style="background:#1f2937;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)"><div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">网站公告</div><div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">' + text.replace(/</g,'&lt;') + '</div><button id="ann-close2" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button></div>';
+                o.innerHTML = '<div style="background:#1f2937;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)"><div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">网站公告</div><div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">' + text.replace(/</g,'&lt;') + '</div><button id="ann-close3" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button></div>';
                 document.body.appendChild(o);
                 var cb = function() { o.remove(); localStorage.setItem(key, '1'); };
-                o.querySelector('#ann-close2').onclick = cb;
+                o.querySelector('#ann-close3').onclick = cb;
                 o.addEventListener('click', function(e) { if (e.target === o) cb(); });
               }
             }
           }
-        } catch (_) {}
+        } catch(e) { console.error('announcement:', e); }
       }
       loadFeatureToggles();
 
