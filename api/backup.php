@@ -9,6 +9,10 @@ ini_set('display_errors', 0);
  */
 
 require_once __DIR__ . '/../db.php';
+
+if (!empty($_COOKIE['IMAGES20_ADMIN'])) {
+    session_name('IMAGES20_ADMIN');
+}
 session_start();
 
 $user = $_SESSION['user'] ?? null;

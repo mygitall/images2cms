@@ -15,6 +15,11 @@ ini_set('display_errors', 0);
  */
 
 require_once __DIR__ . '/../db.php';
+
+// 识别后台管理 session，避免被前台 session 覆盖
+if (!empty($_COOKIE['IMAGES20_ADMIN'])) {
+    session_name('IMAGES20_ADMIN');
+}
 session_start();
 
 $user = $_SESSION['user'] ?? null;

@@ -3,6 +3,10 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../db.php';
+
+if (!empty($_COOKIE['IMAGES20_ADMIN'])) {
+    session_name('IMAGES20_ADMIN');
+}
 session_start();
 $user = $_SESSION['user'] ?? null;
 if (!$user) { http_response_code(401); echo json_encode(['error'=>'未登录']); exit; }
