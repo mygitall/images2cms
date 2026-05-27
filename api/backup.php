@@ -75,31 +75,25 @@ if ($action === 'import') {
     $imported = 0;
     $errors = [];
 
-    // 按分号拆分 SQL 语句
-    $statements = array_filter(
-        array_map('trim', explode(";\n", $sql . ";\n")),
-        function ($s) { return !empty($s) && substr($s, 0, 2) !== '--' && substr($s, 0, 2) !== '/*'; }
-    );
-
+    // 按分号拆分，逐条执行（保留执行顺序）
+    $parts = explode(';', $sql);
     $pdo->beginTransaction();
     try {
-        // 先执行 DROP/CREATE 和 TRUNCATE
-        foreach ($statements as $stmt) {
-            $upper = strtoupper(substr(trim($stmt), 0, 20));
-            if (strpos($upper, 'DROP TABLE') === 0 || strpos($upper, 'CREATE TABLE') === 0 || strpos($upper, 'TRUNCATE') === 0) {
-                try { $pdo->exec($stmt); } catch (\Throwable $e) {}
-            }
-        }
-        // 再执行 INSERT
-        foreach ($statements as $stmt) {
-            $upper = strtoupper(substr(trim($stmt), 0, 6));
-            if ($upper === 'INSERT') {
+        foreach ($parts as $stmt) {
+            $stmt = trim($stmt);
+            if (empty($stmt)) continue;
+            if (strpos($stmt, '--') === 0 || strpos($stmt, '/*') === 0) continue;
+
+            $upper6 = strtoupper(substr($stmt, 0, 6));
+            if ($upper6 === 'INSERT') {
                 try {
                     $pdo->exec($stmt);
                     $imported++;
                 } catch (\Throwable $e) {
-                    $errors[] = substr($stmt, 0, 100) . ': ' . $e->getMessage();
+                    $errors[] = substr($stmt, 0, 80) . '... — ' . $e->getMessage();
                 }
+            } elseif (preg_match('/^(DROP|CREATE|TRUNCATE|SET\s+FOREIGN|SET\s+NAMES)/i', $stmt)) {
+                try { $pdo->exec($stmt); } catch (\Throwable $e) {}
             }
         }
         $pdo->commit();
@@ -183,8 +177,10 @@ function exportSQL($tables, $filename) {
             $rows = $pdo->query("SELECT * FROM `{$t}`");
             $batch = [];
             $count = 0;
+            $colsBuilt = '';
 
             while ($row = $rows->fetch(PDO::FETCH_ASSOC)) {
+                if (empty($colsBuilt)) $colsBuilt = '`' . implode('`,`', array_keys($row)) . '`';
                 $vals = array_map(function ($v) use ($pdo) {
                     if ($v === null) return 'NULL';
                     return $pdo->quote($v);
@@ -193,16 +189,13 @@ function exportSQL($tables, $filename) {
                 $count++;
 
                 if (count($batch) >= 50) {
-                    $cols = '`' . implode('`,`', array_keys($row)) . '`';
-                    $out .= "INSERT INTO `{$t}` ({$cols}) VALUES\n" . implode(",\n", $batch) . ";\n\n";
+                    $out .= "INSERT INTO `{$t}` ({$colsBuilt}) VALUES\n" . implode(",\n", $batch) . ";\n\n";
                     $batch = [];
                 }
             }
 
-            // 输出剩余批次
             if (!empty($batch)) {
-                $cols = '`' . implode('`,`', array_keys($row)) . '`';
-                $out .= "INSERT INTO `{$t}` ({$cols}) VALUES\n" . implode(",\n", $batch) . ";\n\n";
+                $out .= "INSERT INTO `{$t}` ({$colsBuilt}) VALUES\n" . implode(",\n", $batch) . ";\n\n";
             }
 
             $out .= "\n";
