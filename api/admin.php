@@ -39,11 +39,18 @@ header('Content-Type: application/json; charset=utf-8');
 function ok($data = null) { echo json_encode($data ?: ['ok' => true], JSON_UNESCAPED_UNICODE); exit; }
 function err($msg, $code = 400) { http_response_code($code); echo json_encode(['error' => $msg], JSON_UNESCAPED_UNICODE); exit; }
 
+function recordAudit($pdo, $adminId, $action, $targetType, $targetId, $detail) {
+    try {
+        $pdo->prepare('INSERT INTO admin_audit (admin_id, action, target_type, target_id, detail) VALUES (?,?,?,?,?)')
+            ->execute([$adminId, $action, $targetType, $targetId, $detail]);
+    } catch (\Throwable $e) {}
+}
+
 // ========== 用户管理 ==========
 if ($action === 'users') {
     if ($method === 'GET') {
         $search = trim($_GET['search'] ?? '');
-        $sql = "SELECT u.id, u.username, u.role, u.balance, u.created_at,
+        $sql = "SELECT u.id, u.username, u.role, u.balance, u.notes, u.created_at,
                 (SELECT l.ip FROM login_logs l WHERE l.user_id = u.id ORDER BY l.created_at DESC LIMIT 1) AS last_ip
                 FROM users u";
         if ($search) {
@@ -75,7 +82,13 @@ if ($action === 'users') {
     if ($method === 'DELETE') {
         $id = intval($_GET['id'] ?? 0);
         if ($id === $user['id']) err('不能删除自己');
+        // 先记用户名用于审计
+        $stmt = $pdo->prepare('SELECT username FROM users WHERE id = ?');
+        $stmt->execute([$id]);
+        $targetUser = $stmt->fetch();
         $pdo->prepare('DELETE FROM users WHERE id = ?')->execute([$id]);
+        recordAudit($pdo, $user['id'], 'delete_user', 'user', $id,
+            '删除用户: ' . ($targetUser['username'] ?? 'ID:' . $id));
         ok();
     }
 }
@@ -83,22 +96,73 @@ if ($action === 'users') {
 // ========== 图片管理 ==========
 if ($action === 'images') {
     if ($method === 'GET') {
-        $page  = max(1, intval($_GET['page'] ?? 1));
-        $limit = 20;
-        $offset = ($page - 1) * $limit;
+        $page    = max(1, intval($_GET['page'] ?? 1));
+        $limit   = 20;
+        $offset  = ($page - 1) * $limit;
+        $user_id = isset($_GET['user_id']) ? intval($_GET['user_id']) : 0;
 
-        $total = $pdo->query('SELECT COUNT(*) FROM gen_images')->fetchColumn();
-        $stmt  = $pdo->prepare(
-            'SELECT i.*, u.username FROM gen_images i
-             JOIN users u ON i.user_id = u.id
-             ORDER BY i.created_at DESC LIMIT :l OFFSET :o'
-        );
-        $stmt->bindValue(':l', (int)$limit, PDO::PARAM_INT);
-        $stmt->bindValue(':o', (int)$offset, PDO::PARAM_INT);
-        $stmt->execute();
+        if ($user_id > 0) {
+            $total = $pdo->prepare('SELECT COUNT(*) FROM gen_images WHERE user_id = ?');
+            $total->execute([$user_id]);
+            $total = $total->fetchColumn();
+            $stmt  = $pdo->prepare(
+                'SELECT i.*, u.username FROM gen_images i
+                 JOIN users u ON i.user_id = u.id
+                 WHERE i.user_id = ?
+                 ORDER BY i.created_at DESC LIMIT :l OFFSET :o'
+            );
+            $stmt->bindValue(1, $user_id, PDO::PARAM_INT);
+            $stmt->bindValue(':l', (int)$limit, PDO::PARAM_INT);
+            $stmt->bindValue(':o', (int)$offset, PDO::PARAM_INT);
+            $stmt->execute();
+        } else {
+            $total = $pdo->query('SELECT COUNT(*) FROM gen_images')->fetchColumn();
+            $stmt  = $pdo->prepare(
+                'SELECT i.*, u.username FROM gen_images i
+                 JOIN users u ON i.user_id = u.id
+                 ORDER BY i.created_at DESC LIMIT :l OFFSET :o'
+            );
+            $stmt->bindValue(':l', (int)$limit, PDO::PARAM_INT);
+            $stmt->bindValue(':o', (int)$offset, PDO::PARAM_INT);
+            $stmt->execute();
+        }
         $list = $stmt->fetchAll();
 
         ok(['list' => $list, 'total' => intval($total), 'page' => $page, 'pages' => ceil($total / $limit)]);
+    }
+
+    if ($method === 'POST') {
+        // 批量删除
+        $ids = $input['ids'] ?? [];
+        if (empty($ids) || !is_array($ids)) err('ids 参数缺失');
+        $config = require __DIR__ . '/../config.php';
+        $saveDir = rtrim($config['save_dir'], '/');
+        $deleted = 0;
+        foreach ($ids as $id) {
+            $id = intval($id);
+            if ($id <= 0) continue;
+            // 先查文件名，删除物理文件
+            $img = $pdo->prepare('SELECT filename FROM gen_images WHERE id = ?');
+            $img->execute([$id]);
+            $row = $img->fetch();
+            if ($row) {
+                // 尝试用户子目录 + 根目录
+                $stmt2 = $pdo->prepare('SELECT u.username FROM gen_images i JOIN users u ON i.user_id = u.id WHERE i.id = ?');
+                $stmt2->execute([$id]);
+                $userRow = $stmt2->fetch();
+                $filePath = '';
+                if ($userRow) {
+                    $filePath = $saveDir . '/' . $userRow['username'] . '/' . $row['filename'];
+                    if (!file_exists($filePath)) $filePath = $saveDir . '/' . $row['filename'];
+                } else {
+                    $filePath = $saveDir . '/' . $row['filename'];
+                }
+                if (file_exists($filePath)) @unlink($filePath);
+            }
+            $pdo->prepare('DELETE FROM gen_images WHERE id = ?')->execute([$id]);
+            $deleted++;
+        }
+        ok(['count' => $deleted]);
     }
 
     if ($method === 'DELETE') {
@@ -115,6 +179,16 @@ if ($action === 'images') {
         $pdo->prepare('DELETE FROM gen_images WHERE id = ?')->execute([$id]);
         ok();
     }
+}
+
+// ========== 单张图片详情 ==========
+if ($action === 'image_detail') {
+    $id = intval($_GET['id'] ?? 0);
+    $stmt = $pdo->prepare('SELECT i.*, u.username FROM gen_images i JOIN users u ON i.user_id = u.id WHERE i.id = ?');
+    $stmt->execute([$id]);
+    $row = $stmt->fetch();
+    if (!$row) err('图片不存在', 404);
+    ok($row);
 }
 
 // ========== 配置管理（多 Profile）==========
@@ -143,15 +217,18 @@ if ($action === 'config') {
             $name = trim($input['name'] ?? '');
             if (!$name) err('名称不能为空');
             $config['profiles'][$name] = ['api_key' => '', 'base_url' => ''];
+            $auditDetail = '添加配置: ' . $name;
         } elseif ($action2 === 'delete') {
             $name = $input['name'] ?? '';
             if ($name === 'default') err('不能删除默认配置');
             unset($config['profiles'][$name]);
             if ($config['active'] === $name) $config['active'] = 'default';
+            $auditDetail = '删除配置: ' . $name;
         } elseif ($action2 === 'switch') {
             $name = $input['name'] ?? 'default';
             if (!isset($config['profiles'][$name])) err('配置不存在');
             $config['active'] = $name;
+            $auditDetail = '切换配置: ' . $name;
         } elseif ($action2 === 'save') {
             $name = $input['name'] ?? 'default';
             $newKey = trim($input['api_key'] ?? '');
@@ -159,10 +236,12 @@ if ($action === 'config') {
             if (!isset($config['profiles'][$name])) $config['profiles'][$name] = [];
             if ($newKey) $config['profiles'][$name]['api_key'] = $newKey;
             if ($newUrl) $config['profiles'][$name]['base_url'] = $newUrl;
+            $auditDetail = '保存配置: ' . $name . ($newKey ? ' (更新Key)' : '') . ($newUrl ? ' (更新URL)' : '');
         }
 
         $export = var_export($config, true);
         file_put_contents($configFile, "<?php\nreturn {$export};\n");
+        recordAudit($pdo, $user['id'], 'config_change', 'config', 0, $auditDetail ?? '');
         ok();
     }
 }
@@ -364,6 +443,35 @@ if ($action === 'stats') {
         ];
     } catch (\Throwable $e) {}
 
+    // CSV 导出
+    if (($_GET['format'] ?? '') === 'csv') {
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="stats_export_' . date('Ymd') . '.csv"');
+        $out = fopen('php://output', 'w');
+        fprintf($out, "\xEF\xBB\xBF"); // BOM for Excel UTF-8
+        fputcsv($out, ['=== 概览 ===']);
+        fputcsv($out, ['总生成量', '今日生成', '总用户数', '已删图片']);
+        fputcsv($out, [$overview['total_images']??0, $overview['today_images']??0, $overview['total_users']??0, $overview['deleted_images']??0]);
+        fputcsv($out, ['']);
+        fputcsv($out, ['=== 每日生成量 ===']);
+        fputcsv($out, ['日期', '数量']);
+        foreach ($daily as $d) fputcsv($out, [$d['day'], $d['cnt']]);
+        fputcsv($out, ['']);
+        fputcsv($out, ['=== 用户活跃度 ===']);
+        fputcsv($out, ['用户名', '生成数量']);
+        foreach ($users as $u) fputcsv($out, [$u['username'], $u['cnt']]);
+        fputcsv($out, ['']);
+        fputcsv($out, ['=== 模型使用分布 ===']);
+        fputcsv($out, ['模型', '数量']);
+        foreach ($models as $m) fputcsv($out, [$m['model'], $m['cnt']]);
+        fputcsv($out, ['']);
+        fputcsv($out, ['=== 访问统计 ===']);
+        fputcsv($out, ['总访问', '今日', '昨日', '近7天']);
+        fputcsv($out, [$visits['total']??0, $visits['today']??0, $visits['yesterday']??0, $visits['last_7d']??0]);
+        fclose($out);
+        exit;
+    }
+
     ok([
         'daily'   => $daily,
         'models'  => $models,
@@ -428,6 +536,82 @@ if ($action === 'ranking') {
          GROUP BY i.user_id ORDER BY cnt DESC'
     );
     ok($stmt->fetchAll());
+}
+
+// ========== 更新用户备注 ==========
+if ($action === 'update_note') {
+    $uid   = intval($input['user_id'] ?? 0);
+    $notes = mb_substr(trim($input['notes'] ?? ''), 0, 500);
+    $pdo->prepare('UPDATE users SET notes = ? WHERE id = ?')->execute([$notes, $uid]);
+    ok(['notes' => $notes]);
+}
+
+// ========== 批量加积分 ==========
+if ($action === 'batch_topup') {
+    $user_ids = $input['user_ids'] ?? [];
+    $amount   = floatval($input['amount'] ?? 0);
+    $reason   = trim($input['reason'] ?? '批量加积分');
+    if (empty($user_ids)) err('请选择用户');
+    if ($amount <= 0) err('金额必须大于 0');
+    $count = 0;
+    foreach ($user_ids as $uid) {
+        $uid = intval($uid);
+        $pdo->beginTransaction();
+        try {
+            $pdo->prepare('UPDATE users SET balance = balance + ? WHERE id = ?')->execute([$amount, $uid]);
+            $stmt = $pdo->prepare('SELECT balance FROM users WHERE id = ?');
+            $stmt->execute([$uid]);
+            $newBal = $stmt->fetchColumn();
+            $pdo->prepare('INSERT INTO balance_logs (user_id, amount, type, reason, balance_after) VALUES (?,?,?,?,?)')
+                ->execute([$uid, $amount, 'topup', $reason, $newBal]);
+            $pdo->commit();
+            $count++;
+        } catch (\Throwable $e) {
+            $pdo->rollBack();
+        }
+    }
+    recordAudit($pdo, $user['id'], 'batch_topup', 'users', 0,
+        '批量加积分: ' . $count . ' 位用户, 每人 ¥' . number_format($amount, 2) . ', 原因: ' . $reason);
+    ok(['count' => $count, 'amount' => $amount]);
+}
+
+// ========== 审计日志 ==========
+if ($action === 'audit_logs') {
+    $page  = max(1, intval($_GET['page'] ?? 1));
+    $limit = 50;
+    $offset = ($page - 1) * $limit;
+    $total = $pdo->query('SELECT COUNT(*) FROM admin_audit')->fetchColumn();
+    $stmt = $pdo->prepare(
+        'SELECT a.*, u.username AS admin_name FROM admin_audit a
+         LEFT JOIN users u ON a.admin_id = u.id
+         ORDER BY a.created_at DESC LIMIT :l OFFSET :o'
+    );
+    $stmt->bindValue(':l', $limit, PDO::PARAM_INT);
+    $stmt->bindValue(':o', $offset, PDO::PARAM_INT);
+    $stmt->execute();
+    ok(['list' => $stmt->fetchAll(), 'total' => intval($total), 'page' => $page, 'pages' => ceil($total / $limit)]);
+}
+
+// ========== 通知数据 ==========
+if ($action === 'notifications') {
+    $newUsers = $pdo->query("SELECT COUNT(*) FROM users WHERE DATE(created_at) = CURDATE()")->fetchColumn();
+    $failedApi = $pdo->query("SELECT COUNT(*) FROM api_logs WHERE status = 'error' AND DATE(created_at) = CURDATE()")->fetchColumn();
+    $recentErrors = $pdo->query(
+        "SELECT l.*, u.username FROM api_logs l
+         LEFT JOIN users u ON l.user_id = u.id
+         WHERE l.status = 'error'
+         ORDER BY l.created_at DESC LIMIT 20"
+    )->fetchAll();
+    $recentRegs = $pdo->query(
+        "SELECT id, username, created_at FROM users WHERE DATE(created_at) = CURDATE() ORDER BY created_at DESC LIMIT 20"
+    )->fetchAll();
+    ok([
+        'new_users_today' => intval($newUsers),
+        'failed_api_today' => intval($failedApi),
+        'total_events' => intval($newUsers) + intval($failedApi),
+        'recent_errors' => $recentErrors,
+        'recent_registrations' => $recentRegs
+    ]);
 }
 
 err('未知 action');

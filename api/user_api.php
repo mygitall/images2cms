@@ -60,6 +60,8 @@ if ($action === 'topup') {
         $pdo->prepare('INSERT INTO balance_logs (user_id, amount, type, reason, balance_after) VALUES (?,?,?,?,?)')
             ->execute([$uid, $amt, 'topup', '管理员充值', $newBal]);
         $pdo->commit();
+        // 审计记录
+        try { $pdo->prepare('INSERT INTO admin_audit (admin_id, action, target_type, target_id, detail) VALUES (?,?,?,?,?)')->execute([$user['id'], 'topup', 'user', $uid, '为用户充值 ¥' . number_format($amt, 2)]); } catch (\Throwable $e) {}
         echo json_encode(['ok'=>true, 'balance'=>$newBal]);
     } catch (\Throwable $e) {
         $pdo->rollBack();
@@ -117,6 +119,8 @@ if ($action === 'set_balance') {
         $pdo->prepare('INSERT INTO balance_logs (user_id, amount, type, reason, balance_after) VALUES (?,?,?,?,?)')
             ->execute([$uid, abs($diff), $diff >= 0 ? 'topup' : 'deduct', $reason, $newBal]);
         $pdo->commit();
+        // 审计记录
+        try { $pdo->prepare('INSERT INTO admin_audit (admin_id, action, target_type, target_id, detail) VALUES (?,?,?,?,?)')->execute([$user['id'], 'set_balance', 'user', $uid, '调整余额: ¥' . number_format($oldBal, 2) . ' → ¥' . number_format($newBal, 2) . ' (原因: ' . $reason . ')']); } catch (\Throwable $e) {}
         echo json_encode(['ok'=>true, 'balance'=>$newBal]);
     } catch (\Throwable $e) {
         $pdo->rollBack();

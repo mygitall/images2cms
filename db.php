@@ -24,6 +24,7 @@ try {
 
 // 余额表
 try { $pdo->exec("ALTER TABLE `users` ADD COLUMN `balance` DECIMAL(10,2) DEFAULT 0.00"); } catch (\Throwable $e) {}
+try { $pdo->exec("ALTER TABLE `users` ADD COLUMN `notes` VARCHAR(500) DEFAULT ''"); } catch (\Throwable $e) {}
 $pdo->exec("
   CREATE TABLE IF NOT EXISTS `balance_logs` (
     `id`          INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,8 +51,22 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
-// 自动清理 30 天前的旧日志（每次 5% 概率执行）
+// 自动清理旧日志（每次 5% 概率执行，保留天数从配置读取，默认 30）
 if (mt_rand(1, 20) === 1) {
-    try { $pdo->exec("DELETE FROM api_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"); } catch (\Throwable $e) {}
-    try { $pdo->exec("DELETE FROM login_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"); } catch (\Throwable $e) {}
+    $config = require __DIR__ . '/config.php';
+    $retentionDays = intval($config['features']['log_retention_days'] ?? 30);
+    try { $pdo->exec("DELETE FROM api_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL {$retentionDays} DAY)"); } catch (\Throwable $e) {}
+    try { $pdo->exec("DELETE FROM login_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL {$retentionDays} DAY)"); } catch (\Throwable $e) {}
 }
+
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS admin_audit (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT,
+    action VARCHAR(50),
+    target_type VARCHAR(30),
+    target_id INT,
+    detail TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");

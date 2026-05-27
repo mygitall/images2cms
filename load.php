@@ -47,6 +47,41 @@ if (!file_exists($filePath)) {
 }
 
 $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
+// 缩略图模式：生成 80x80 缩略图
+$thumb = ($_GET['thumb'] ?? '') === '1';
+if ($thumb && in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'])) {
+    $src = null;
+    switch ($ext) {
+        case 'jpeg': case 'jpg': $src = @imagecreatefromjpeg($filePath); break;
+        case 'png': $src = @imagecreatefrompng($filePath); break;
+        case 'gif': $src = @imagecreatefromgif($filePath); break;
+        case 'webp': $src = @imagecreatefromwebp($filePath); break;
+    }
+    if ($src) {
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $tw = 80; $th = 80;
+        if ($w > $h) { $nw = $tw; $nh = max(1, intval($h * ($tw / $w))); }
+        else { $nh = $th; $nw = max(1, intval($w * ($th / $h))); }
+        $thumbImg = imagecreatetruecolor($tw, $th);
+        imagealphablending($thumbImg, false);
+        imagesavealpha($thumbImg, true);
+        $transparent = imagecolorallocatealpha($thumbImg, 0, 0, 0, 127);
+        imagefill($thumbImg, 0, 0, $transparent);
+        imagealphablending($thumbImg, true);
+        $dx = intval(($tw - $nw) / 2);
+        $dy = intval(($th - $nh) / 2);
+        imagecopyresampled($thumbImg, $src, $dx, $dy, 0, 0, $nw, $nh, $w, $h);
+        header('Content-Type: image/png');
+        header('Cache-Control: public, max-age=31536000');
+        imagepng($thumbImg);
+        imagedestroy($src);
+        imagedestroy($thumbImg);
+        exit;
+    }
+}
+
 $mimeTypes = ['png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','gif'=>'image/gif','webp'=>'image/webp'];
 $mime = $mimeTypes[$ext] ?? 'image/png';
 

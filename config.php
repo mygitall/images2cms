@@ -5,7 +5,7 @@ return array (
   array (
     'default' => 
     array (
-      'api_key' => 'sk-fGaLdj7l5vXhv1ZdjmpzuOClbpcyilVOW38Mc2lfyZdpao3L',
+      'api_key' => 'sk-etNyRftUVqza8jbAgSiQ19zMkKkVTrqpJtKocVEdcBTBfzAB',
       'base_url' => 'https://api.tokln.com',
     ),
   ),
@@ -15,6 +15,8 @@ return array (
     'show_folder_card' => false,
     'show_presets' => true,
     'disable_register' => false,
+    'daily_reg_max' => '2',
+    'register_block_msg' => '暂时停止注册',
   ),
   'installed' => true,
 );

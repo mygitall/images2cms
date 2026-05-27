@@ -183,15 +183,23 @@ $isAdmin = $user && $user['role'] === 'admin';
         <button data-tab="apilog">API 日志</button>
         <button data-tab="logs">操作记录</button>
         <button data-tab="config">API 配置</button>
+        <button data-tab="audit">审计日志</button>
+        <button data-tab="notifications">通知<span class="notif-badge" id="notif-badge" style="display:none;background:var(--danger);color:#fff;font-size:10px;padding:1px 6px;border-radius:10px;margin-left:4px;font-weight:600">0</span></button>
       </div>
 
       <div class="msg" id="msg"></div>
 
       <div class="card tab-content" id="tab-images">
-        <h2>生成图片记录 <button class="btn-ghost" style="margin-left:12px" onclick="showRanking()">由高到低</button></h2>
+        <h2>生成图片记录
+          <button class="btn-ghost" style="margin-left:12px" onclick="showRanking()">由高到低</button>
+          <button class="btn-danger" style="padding:4px 12px;font-size:11px;margin-left:8px" onclick="batchDeleteImages()">批量删除</button>
+          <select id="image-user-filter" onchange="loadImages()" style="margin-left:8px">
+            <option value="">全部用户</option>
+          </select>
+        </h2>
         <div id="ranking-box" style="display:none;margin-bottom:16px;padding:12px;background:rgba(0,0,0,0.02);border-radius:10px"></div>
-        <table><thead><tr><th>ID</th><th>用户</th><th>文件名</th><th>提示词</th><th>模型</th><th>时间</th><th>操作</th></tr></thead>
-          <tbody id="images-tbody"><tr><td colspan="7" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        <table><thead><tr><th style="width:30px"><input type="checkbox" id="check-all-images" onchange="toggleCheckAll(this)" title="全选"></th><th>ID</th><th style="width:50px">缩略图</th><th>用户</th><th>文件名</th><th>提示词</th><th>模型</th><th>时间</th><th>操作</th></tr></thead>
+          <tbody id="images-tbody"><tr><td colspan="9" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
         <div class="pagination" id="images-pager"></div>
       </div>
 
@@ -202,9 +210,10 @@ $isAdmin = $user && $user['role'] === 'admin';
           <select id="new-role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
           <button class="btn" onclick="createUser()">添加用户</button>
           <input id="user-search" placeholder="搜索用户名..." style="width:200px" oninput="searchUsers()">
+          <button class="btn" onclick="openBatchTopup()" style="font-size:12px;padding:8px 14px">批量加积分</button>
         </div>
-        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>余额</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
-          <tbody id="users-tbody"><tr><td colspan="8" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        <table><thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>余额</th><th>备注</th><th>最近生图</th><th>最近IP</th><th>最近操作</th><th>注册时间</th><th>操作</th></tr></thead>
+          <tbody id="users-tbody"><tr><td colspan="10" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
       </div>
 
       <div class="card tab-content" id="tab-logs" style="display:none">
@@ -260,7 +269,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       </div>
 
       <div class="card tab-content" id="tab-stats" style="display:none">
-        <h2>用量统计仪表盘</h2>
+        <h2>用量统计仪表盘 <a class="btn" href="../api/admin.php?action=stats&format=csv" target="_blank" style="font-size:12px;padding:6px 14px;text-decoration:none;margin-left:12px">导出CSV</a></h2>
         <div id="stats-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
         <div id="visits-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
         <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
@@ -283,6 +292,24 @@ $isAdmin = $user && $user['role'] === 'admin';
             <canvas id="chart-models" height="120"></canvas>
           </div>
         </div>
+        <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);margin-top:10px;grid-column:1/-1">
+          <h3 style="font-size:12px;font-weight:600;margin-bottom:8px">模型使用详情</h3>
+          <table><thead><tr><th>模型</th><th>总生成量</th><th>占比</th></tr></thead>
+            <tbody id="model-detail-tbody"><tr><td colspan="3">加载中...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card tab-content" id="tab-audit" style="display:none">
+        <h2>审计日志</h2>
+        <table><thead><tr><th>时间</th><th>管理员</th><th>操作</th><th>目标</th><th>详情</th></tr></thead>
+          <tbody id="audit-tbody"><tr><td colspan="5" style="color:var(--text-tertiary)">加载中...</td></tr></tbody></table>
+        <div class="pagination" id="audit-pager"></div>
+      </div>
+
+      <div class="card tab-content" id="tab-notifications" style="display:none">
+        <h2>通知中心</h2>
+        <div id="notif-content" style="background:var(--popup-bg);border-radius:16px;padding:24px;max-height:70vh;overflow-y:auto;border:1px solid var(--card-border)">加载中...</div>
       </div>
 
       <div class="card tab-content" id="tab-config" style="display:none">
@@ -391,6 +418,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     document.getElementById('admin-username').textContent = '<?= htmlspecialchars($user['username']) ?> · 管理员';
 
     loadImages();
+    loadUserFilter();
     <?php endif; ?>
 
     // ====== 标签页 ======
@@ -400,7 +428,7 @@ $isAdmin = $user && $user['role'] === 'admin';
         btn.classList.add('active');
         document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
         document.getElementById('tab-' + btn.dataset.tab).style.display = '';
-        if (btn.dataset.tab === 'images') loadImages();
+        if (btn.dataset.tab === 'images') { loadImages(); loadUserFilter(); }
         if (btn.dataset.tab === 'users') loadUsers();
         if (btn.dataset.tab === 'logs') loadAllLogs();
         if (btn.dataset.tab === 'stats') loadStats();
@@ -409,40 +437,129 @@ $isAdmin = $user && $user['role'] === 'admin';
         if (btn.dataset.tab === 'toggles') loadToggles();
         if (btn.dataset.tab === 'recharge') loadRecharge();
         if (btn.dataset.tab === 'config') loadConfig();
+        if (btn.dataset.tab === 'audit') loadAuditLogs();
+        if (btn.dataset.tab === 'notifications') { loadNotifications(); loadNotificationBadge(); }
       });
     });
 
     // ====== 图片列表 ======
     async function loadImages(page = 1) {
       imagesPage = page;
-      const res = await fetch(`../api/admin.php?action=images&page=${page}`);
+      const uid = document.getElementById('image-user-filter')?.value || '';
+      let url = `../api/admin.php?action=images&page=${page}`;
+      if (uid) url += '&user_id=' + encodeURIComponent(uid);
+      const res = await fetch(url);
       const data = await res.json();
       allImages = data.list || [];
       const tbody = document.getElementById('images-tbody');
       if (!data.list || !data.list.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="color:var(--text-tertiary)">暂无记录</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="color:var(--text-tertiary)">暂无记录</td></tr>';
       } else {
         tbody.innerHTML = data.list.map((r, i) => `
           <tr>
-            <td>${r.id}</td><td style="cursor:pointer" onclick="showUserDetail(${r.user_id})">${esc(r.username)}</td>
+            <td><input type="checkbox" class="img-check" value="${r.id}" onchange="updateCheckAll()"></td>
+            <td>${r.id}</td>
+            <td style="width:50px"><img src="../load.php?file=${encodeURIComponent(r.filename)}&user=${encodeURIComponent(r.username)}&thumb=1" style="width:40px;height:40px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="showImageDetail(${r.id})" onerror="this.style.display='none'" loading="lazy" title="点击查看详情"></td>
+            <td style="cursor:pointer" onclick="showUserDetail(${r.user_id})">${esc(r.username)}</td>
             <td style="font-family:monospace;font-size:12px;cursor:pointer;text-decoration:underline;color:#3b82f6" onclick="previewImage('${esc(r.filename)}','${esc(r.username)}',${i})">${esc(r.filename)}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.prompt||'')}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-decoration:underline;color:#3b82f6" onclick="showImageDetail(${r.id})">${esc(r.prompt||'')}</td>
             <td style="font-size:12px">${esc(r.model||'')}</td>
             <td style="font-size:12px">${r.created_at||''}</td>
             <td><button class="btn-danger" style="padding:4px 10px;font-size:11px;border-radius:6px" onclick="deleteImage(${r.id})">删除</button></td>
           </tr>`).join('');
       }
       const pager = document.getElementById('images-pager');
+      const totalFiltered = data.total || 0;
       pager.innerHTML = `
         <button class="btn-ghost" ${data.page <= 1 ? 'disabled' : ''} onclick="loadImages(${data.page - 1})">上一页</button>
-        <span>第 ${data.page} / ${data.pages || 1} 页 · 共 ${data.total} 条</span>
+        <span>第 ${data.page} / ${data.pages || 1} 页 · 共 ${totalFiltered} 条</span>
         <button class="btn-ghost" ${data.page >= data.pages ? 'disabled' : ''} onclick="loadImages(${data.page + 1})">下一页</button>`;
+      document.getElementById('check-all-images').checked = false;
+    }
+
+    // ====== 加载用户筛选下拉框 ======
+    async function loadUserFilter() {
+      var sel = document.getElementById('image-user-filter');
+      if (!sel) return;
+      var currentVal = sel.value;
+      try {
+        var res = await fetch('../api/admin.php?action=users');
+        var users = await res.json();
+        sel.innerHTML = '<option value="">全部用户</option>' +
+          users.map(function(u) {
+            return '<option value="' + u.id + '">' + esc(u.username) + '</option>';
+          }).join('');
+        sel.value = currentVal;
+      } catch (e) {}
     }
 
     async function deleteImage(id) {
       if (!confirm('确定删除？也会删除服务器上的图片文件')) return;
       await fetch(`../api/admin.php?action=images&id=${id}`, { method: 'DELETE' });
       showMsg('已删除', 'ok'); loadImages(imagesPage);
+    }
+
+    // ====== 批量删除 ======
+    function toggleCheckAll(el) {
+      document.querySelectorAll('.img-check').forEach(cb => cb.checked = el.checked);
+    }
+    function updateCheckAll() {
+      var all = document.querySelectorAll('.img-check');
+      var checked = document.querySelectorAll('.img-check:checked');
+      document.getElementById('check-all-images').checked = all.length > 0 && checked.length === all.length;
+    }
+    async function batchDeleteImages() {
+      var checked = document.querySelectorAll('.img-check:checked');
+      if (checked.length === 0) { showMsg('请先勾选要删除的图片', 'err'); return; }
+      if (!confirm('确定批量删除 ' + checked.length + ' 张图片？也会删除服务器上的图片文件')) return;
+      var ids = Array.from(checked).map(cb => parseInt(cb.value));
+      var res = await fetch('../api/admin.php?action=images', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids })
+      });
+      var data = await res.json();
+      showMsg('已删除 ' + data.count + ' 张图片', 'ok');
+      loadImages(imagesPage);
+    }
+
+    // ====== 图片详情弹窗 ======
+    async function showImageDetail(id) {
+      var r = allImages.find(function(img) { return img.id === id; });
+      if (!r) {
+        var res = await fetch('../api/admin.php?action=image_detail&id=' + id);
+        r = await res.json();
+        if (r.error) { showMsg(r.error, 'err'); return; }
+        r.username = r.username || '';
+      }
+      var imgUrl = '../load.php?file=' + encodeURIComponent(r.filename) + '&user=' + encodeURIComponent(r.username);
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.innerHTML = '<div style="background:var(--popup-bg);border-radius:16px;padding:24px;max-width:90vw;max-height:90vh;overflow-y:auto;border:1px solid var(--card-border);display:flex;flex-wrap:wrap;gap:20px">'
+        + '<div style="flex:1;min-width:250px;max-width:500px">'
+        + '<img src="' + imgUrl + '" style="width:100%;max-height:70vh;object-fit:contain;border-radius:8px">'
+        + '</div>'
+        + '<div style="flex:1;min-width:250px;max-width:400px">'
+        + '<h3 style="margin-bottom:12px;font-size:16px">图片详情 #' + r.id + '</h3>'
+        + '<table style="width:100%">'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px;width:60px">提示词</td><td style="font-size:13px;word-break:break-all;line-height:1.5">' + esc(r.prompt||'无') + '</td></tr>'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px">模型</td><td style="font-size:13px">' + esc(r.model||'未知') + '</td></tr>'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px">分辨率</td><td style="font-size:13px">' + esc(r.resolution||'—') + '</td></tr>'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px">用户</td><td style="font-size:13px">' + esc(r.username||'') + '</td></tr>'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px">文件名</td><td style="font-size:12px;font-family:monospace;word-break:break-all">' + esc(r.filename||'') + '</td></tr>'
+        + '<tr><td style="color:var(--text-tertiary);padding:4px 0;font-size:12px">创建时间</td><td style="font-size:12px">' + (r.created_at||'') + '</td></tr>'
+        + '</table>'
+        + '<div style="margin-top:12px;display:flex;gap:8px">'
+        + '<a href="' + imgUrl + '" target="_blank" class="btn-ghost" style="text-decoration:none;display:inline-block">查看原图</a>'
+        + '<button class="btn-danger" style="padding:6px 14px;font-size:12px;border-radius:8px" id="detail-delete-btn">删除</button>'
+        + '</div></div></div>';
+      document.body.appendChild(overlay);
+      overlay.querySelector('#detail-delete-btn').onclick = async function() {
+        if (!confirm('确定删除？也会删除服务器上的图片文件')) return;
+        await fetch('../api/admin.php?action=images&id=' + id, { method: 'DELETE' });
+        overlay.remove();
+        showMsg('已删除', 'ok'); loadImages(imagesPage);
+      };
+      overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
     }
 
     // ====== 用户列表 ======
@@ -454,7 +571,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const list = await res.json();
       const tbody = document.getElementById('users-tbody');
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="8" style="color:var(--text-tertiary)">暂无用户</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="color:var(--text-tertiary)">暂无用户</td></tr>';
       } else {
         // 并行加载每个用户的最新操作
         const logs = await Promise.all(list.map(u =>
@@ -465,11 +582,17 @@ $isAdmin = $user && $user['role'] === 'admin';
           const logText = latest
             ? `<span style="font-size:11px">${esc(latest.filename||'')}${latest.deleted_at ? ' <span style="color:var(--danger)">已删</span>' : ''}</span><br><span style="font-size:10px;color:var(--text-tertiary)">${latest.created_at||''}</span>`
             : '<span style="color:var(--text-tertiary);font-size:11px">暂无</span>';
+          const lastGen = latest?.created_at || '-';
+          const notesHtml = u.notes
+            ? `<span style="cursor:pointer;font-size:12px" onclick="editNotes(${u.id}, this)">${esc(u.notes)}</span>`
+            : `<span style="cursor:pointer;font-size:12px;color:var(--text-tertiary)" onclick="editNotes(${u.id}, this)">-</span>`;
           return `
           <tr>
             <td>${u.id}</td><td>${esc(u.username)}</td>
             <td>${u.role === 'admin' ? '管理员' : '用户'}</td>
             <td style="cursor:pointer;color:var(--success);font-weight:500" onclick="editBalance(${u.id},'${esc(u.username)}',${parseFloat(u.balance||0).toFixed(2)})" title="点击修改余额">¥${parseFloat(u.balance||0).toFixed(2)}</td>
+            <td>${notesHtml}</td>
+            <td style="font-size:12px">${lastGen}</td>
             <td style="font-size:11px;font-family:monospace">${esc(u.last_ip||'-')}</td>
             <td>${logText} <button class="btn-ghost" style="padding:1px 6px;font-size:10px;margin-left:4px" onclick="viewUserLogs(${u.id},'${esc(u.username)}')">查看全部</button></td>
             <td style="font-size:12px">${u.created_at||''}</td>
@@ -533,6 +656,83 @@ $isAdmin = $user && $user['role'] === 'admin';
         if (d.ok) showMsg('余额已更新为 ¥'+d.balance.toFixed(2), 'ok'), loadUsers();
         else showMsg(d.error||'失败','err');
       });
+    }
+
+    function editNotes(uid, el) {
+      const current = (el.textContent === '-' || el.textContent === '') ? '' : el.textContent;
+      const input = document.createElement('input');
+      input.value = current;
+      input.maxLength = 500;
+      input.style.cssText = 'padding:3px 6px;border:1px solid var(--card-border);border-radius:4px;font-size:12px;width:120px;font-family:var(--font)';
+      el.replaceWith(input);
+      input.focus();
+      input.addEventListener('blur', async () => {
+        const notes = input.value.trim();
+        const span = document.createElement('span');
+        span.textContent = notes || '-';
+        span.style.cssText = notes ? 'cursor:pointer;font-size:12px' : 'cursor:pointer;font-size:12px;color:var(--text-tertiary)';
+        span.onclick = () => editNotes(uid, span);
+        input.replaceWith(span);
+        await fetch('../api/admin.php?action=update_note', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({user_id:uid, notes})
+        });
+      });
+      input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+    }
+
+    // ====== 批量加积分 ======
+    let batchUserData = [];
+    async function openBatchTopup() {
+      const res = await fetch('../api/admin.php?action=users');
+      batchUserData = await res.json();
+      const listHtml = batchUserData.map(u => `
+        <label style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;border-bottom:1px solid var(--card-border)">
+          <input type="checkbox" class="batch-user-cb" value="${u.id}" checked>
+          <span style="flex:1">${esc(u.username)}</span>
+          <span style="color:var(--text-tertiary);font-size:11px">余额: ¥${parseFloat(u.balance||0).toFixed(2)}</span>
+        </label>`).join('');
+      const overlay = document.createElement('div');
+      overlay.id = 'batch-topup-overlay';
+      overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+      overlay.innerHTML = `<div style="background:var(--popup-bg);border-radius:16px;padding:28px;max-width:480px;width:90%;max-height:85vh;display:flex;flex-direction:column">
+        <h2 style="margin-bottom:16px;font-size:16px;font-weight:600">批量加积分</h2>
+        <div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="batch-select-all" checked onchange="document.querySelectorAll('.batch-user-cb').forEach(cb=>cb.checked=this.checked)">
+          <label for="batch-select-all" style="font-size:12px;font-weight:500">全选</label>
+        </div>
+        <div id="batch-user-list" style="max-height:300px;overflow-y:auto;margin-bottom:16px">${listHtml}</div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input id="batch-amount" type="number" step="0.01" min="0.01" placeholder="金额（元）" style="flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;font-family:var(--font)">
+          <input id="batch-reason" placeholder="原因" value="批量加积分" style="flex:1;padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;font-family:var(--font)">
+        </div>
+        <div class="err-msg" id="batch-error" style="display:none"></div>
+        <div style="display:flex;gap:12px;justify-content:flex-end">
+          <button class="dialog-btn dialog-btn-cancel" onclick="document.getElementById('batch-topup-overlay').remove()">取消</button>
+          <button class="dialog-btn dialog-btn-confirm" id="batch-confirm">确认加积分</button>
+        </div>
+      </div>`;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelector('#batch-confirm').addEventListener('click', async () => {
+        const user_ids = Array.from(overlay.querySelectorAll('.batch-user-cb:checked')).map(cb => parseInt(cb.value));
+        const amount = parseFloat(overlay.querySelector('#batch-amount').value);
+        const reason = overlay.querySelector('#batch-reason').value.trim() || '批量加积分';
+        const errEl = overlay.querySelector('#batch-error');
+        if (!user_ids.length) { errEl.textContent = '请至少选择一个用户'; errEl.style.display = ''; return; }
+        if (!amount || amount <= 0) { errEl.textContent = '金额必须大于 0'; errEl.style.display = ''; return; }
+        errEl.style.display = 'none';
+        const res2 = await fetch('../api/admin.php?action=batch_topup', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({user_ids, amount, reason})
+        });
+        const d = await res2.json();
+        if (d.error) { errEl.textContent = d.error; errEl.style.display = ''; return; }
+        showMsg('已为 ' + d.count + ' 位用户各加 ¥' + amount.toFixed(2), 'ok');
+        overlay.remove();
+        loadUsers();
+      });
+      overlay.addEventListener('keydown', e => { if (e.key === 'Escape') overlay.remove(); });
     }
 
     function resetUserPw(uid, username) {
@@ -772,6 +972,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       global_daily_limit:{ label: '全局每日生图上限', desc: '所有用户每天合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_daily_max', inputPlaceholder: '0', isNumber: true },
       global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
       new_user_free:    { label: '新用户免费生图数', desc: '注册后每人可免费生图次数（默认1）', hasInput: true, inputKey: 'new_user_free_count', inputPlaceholder: '1', isNumber: true },
+      log_retention_days: { label: '日志保留天数', desc: 'API日志和操作记录保留天数（默认30）', hasInput: true, inputKey: 'log_retention_days', inputPlaceholder: '30', isNumber: true },
     };
     async function loadToggles() {
       const res = await fetch('../api/admin.php?action=features');
@@ -912,6 +1113,18 @@ $isAdmin = $user && $user['role'] === 'admin';
         },
         options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
       });
+
+      // 模型使用详情表
+      const totalModels = (data.models || []).reduce((s, r) => s + parseInt(r.cnt), 0);
+      const modelTbody = document.getElementById('model-detail-tbody');
+      if (modelTbody && (data.models || []).length) {
+        modelTbody.innerHTML = data.models.map(r => {
+          const pct = totalModels > 0 ? (parseInt(r.cnt) / totalModels * 100).toFixed(1) : '0.0';
+          return `<tr><td style="font-size:12px">${esc(r.model||'未知')}</td><td style="font-size:12px;font-weight:500">${r.cnt}</td><td style="font-size:12px;color:var(--text-secondary)">${pct}%</td></tr>`;
+        }).join('');
+      } else if (modelTbody) {
+        modelTbody.innerHTML = '<tr><td colspan="3" style="color:var(--text-tertiary)">暂无数据</td></tr>';
+      }
     }
 
     async function showUserDetail(uid) {
@@ -995,6 +1208,85 @@ $isAdmin = $user && $user['role'] === 'admin';
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') closePreview();
     });
+
+    // ====== 审计日志 ======
+    let auditPage = 1;
+    async function loadAuditLogs(page = 1) {
+      auditPage = page;
+      const res = await fetch(`../api/admin.php?action=audit_logs&page=${page}`);
+      const data = await res.json();
+      const tbody = document.getElementById('audit-tbody');
+      if (!data.list || !data.list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-tertiary)">暂无审计记录</td></tr>';
+      } else {
+        const actionLabels = { delete_user:'删除用户', batch_topup:'批量加积分', config_change:'修改配置', topup:'充值', set_balance:'调整余额' };
+        tbody.innerHTML = data.list.map(r => `<tr>
+          <td style="font-size:11px">${r.created_at||''}</td>
+          <td style="font-size:11px">${esc(r.admin_name||'ID:'+r.admin_id)}</td>
+          <td><span style="font-size:11px;background:rgba(0,0,0,0.04);padding:2px 8px;border-radius:4px">${actionLabels[r.action] || r.action}</span></td>
+          <td style="font-size:11px">${esc(r.target_type||'')} #${r.target_id}</td>
+          <td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.detail||'')}</td>
+        </tr>`).join('');
+      }
+      const pager = document.getElementById('audit-pager');
+      pager.innerHTML = data.pages > 1
+        ? `<button class="btn-ghost" ${data.page <= 1 ? 'disabled' : ''} onclick="loadAuditLogs(${data.page - 1})">上一页</button>
+           <span style="font-size:12px;color:var(--text-tertiary)">第 ${data.page} / ${data.pages} 页 · 共 ${data.total} 条</span>
+           <button class="btn-ghost" ${data.page >= data.pages ? 'disabled' : ''} onclick="loadAuditLogs(${data.page + 1})">下一页</button>`
+        : '';
+    }
+
+    // ====== 通知中心 ======
+    async function loadNotifications() {
+      const container = document.getElementById('notif-content');
+      container.innerHTML = '<div style="color:var(--text-tertiary)">加载中...</div>';
+      try {
+        const res = await fetch('../api/admin.php?action=notifications');
+        const d = await res.json();
+        let html = '';
+        // 今日新注册
+        html += `<div style="margin-bottom:20px"><h3 style="font-size:13px;font-weight:600;margin-bottom:8px">今日新注册用户 (${d.new_users_today})</h3>`;
+        if (d.recent_registrations && d.recent_registrations.length) {
+          html += '<table><thead><tr><th>用户名</th><th>注册时间</th></tr></thead><tbody>' +
+            d.recent_registrations.map(r => `<tr><td style="font-size:12px">${esc(r.username)}</td><td style="font-size:11px">${r.created_at||''}</td></tr>`).join('') +
+            '</tbody></table>';
+        } else {
+          html += '<div style="font-size:12px;color:var(--text-tertiary)">今日暂无新注册</div>';
+        }
+        html += '</div>';
+        // 今日失败 API
+        html += `<div style="margin-bottom:20px"><h3 style="font-size:13px;font-weight:600;margin-bottom:8px">今日 API 调用失败 (${d.failed_api_today})</h3>`;
+        if (d.recent_errors && d.recent_errors.length) {
+          html += '<table><thead><tr><th>时间</th><th>用户</th><th>接口</th><th>状态码</th></tr></thead><tbody>' +
+            d.recent_errors.map(r => `<tr><td style="font-size:11px">${r.created_at||''}</td><td style="font-size:11px">${esc(r.username||'-')}</td><td style="font-size:11px;font-family:monospace">${esc(r.endpoint||'')}</td><td style="font-size:11px;color:var(--danger)">${r.http_code||''}</td></tr>`).join('') +
+            '</tbody></table>';
+        } else {
+          html += '<div style="font-size:12px;color:var(--text-tertiary)">今日暂无失败调用</div>';
+        }
+        html += '</div>';
+        container.innerHTML = html;
+      } catch(e) {
+        container.innerHTML = '<div style="color:var(--danger);font-size:13px">加载失败</div>';
+      }
+    }
+
+    async function loadNotificationBadge() {
+      try {
+        const res = await fetch('../api/admin.php?action=notifications');
+        const d = await res.json();
+        const badge = document.getElementById('notif-badge');
+        const total = (d.total_events || 0);
+        if (total > 0) {
+          badge.textContent = total;
+          badge.style.display = '';
+        } else {
+          badge.style.display = 'none';
+        }
+      } catch(e) {}
+    }
+
+    // 页面加载时自动刷一次通知角标
+    if (currentUserId) { setTimeout(loadNotificationBadge, 2000); }
   </script>
 </body>
 </html>
