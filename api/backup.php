@@ -143,9 +143,11 @@ if ($action === 'delete_all') {
         echo json_encode(['error' => '需要确认参数'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
     foreach ($tables as $t => $label) {
         try { $pdo->exec("TRUNCATE TABLE `{$t}`"); } catch (\Throwable $e) {}
     }
+    $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
     $pdo->prepare('INSERT INTO users (username, password, role) VALUES (?, ?, ?)')
         ->execute(['admin', password_hash('admin123', PASSWORD_BCRYPT), 'admin']);
     header('Content-Type: application/json; charset=utf-8');
