@@ -5395,34 +5395,25 @@ ${chinesePrompt}
       }
       loadFeatureToggles();
 
-      // ====== 网站公告弹窗 ======
-      setTimeout(async () => {
-        try {
-          const res = await fetch('api/features.php');
-          const f = await res.json();
-          if (f.site_announcement !== false) {
-            const text = f.site_announcement_text || '';
-            const key = 'ann_dismiss_' + (text ? text.length + '_' + text.charCodeAt(0) + '_' + text.charCodeAt(Math.floor(text.length/2)) : 'empty');
-            if (text && localStorage.getItem(key) !== '1') {
-              const overlay = document.createElement('div');
-              overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s';
-              overlay.innerHTML = `<div style="background:#1f2937;border:1px solid rgba(255,255,255,0.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.5)">
-                <div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">📢 网站公告</div>
-                <div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">${text.replace(/</g,'&lt;')}</div>
-                <div style="display:flex;gap:10px;justify-content:center">
-                  <button id="announce-close" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button>
-                </div>
-              </div>`;
-              document.body.appendChild(overlay);
-              overlay.querySelector('#announce-close').onclick = () => {
-                overlay.remove();
-                localStorage.setItem(key, '1');
-              };
-              overlay.addEventListener('click', e => { if (e.target === overlay) { overlay.remove(); localStorage.setItem(key, '1'); } });
-            }
-          }
-        } catch (_) {}
-      }, 500);
+      // ====== 网站公告弹窗（复用在 loadFeatureToggles 之后立即展示） ======
+      (function showAnnouncement() {
+        if (features.site_announcement === false || features.site_announcement === 'false') return;
+        var text = features.site_announcement_text || '';
+        if (!text) return;
+        var key = 'ann_' + text.length;
+        for (var i = 0; i < Math.min(text.length, 5); i++) key += '_' + text.charCodeAt(i);
+        if (localStorage.getItem(key) === '1') return;
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+        var html = '<div style="background:#1f2937;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">';
+        html += '<div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">网站公告</div>';
+        html += '<div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">' + text.replace(/</g,'&lt;') + '</div>';
+        html += '<button id="ann-close" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button></div>';
+        overlay.innerHTML = html;
+        document.body.appendChild(overlay);
+        document.getElementById('ann-close').onclick = function() { overlay.remove(); localStorage.setItem(key, '1'); };
+        overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.remove(); localStorage.setItem(key, '1'); } });
+      })();
 
       // ====== 访问统计埋点 ======
       (function trackVisit() {
