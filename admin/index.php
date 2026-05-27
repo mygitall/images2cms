@@ -1017,6 +1017,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       global_daily_limit:{ label: '全局每日生图上限', desc: '所有用户每天合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_daily_max', inputPlaceholder: '0', isNumber: true },
       global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
       new_user_free:    { label: '新用户免费生图数', desc: '注册后每人可免费生图次数（默认1）', hasInput: true, inputKey: 'new_user_free_count', inputPlaceholder: '1', isNumber: true },
+      gen_cost_yuan:    { label: '每次生图费用（元）', desc: '超过免费次数后每次生图扣费金额（默认0.09）', hasInput: true, inputKey: 'gen_cost_yuan', inputPlaceholder: '0.09', isDecimal: true },
       log_retention_days: { label: '日志保留天数', desc: 'API日志和操作记录保留天数（默认30）', hasInput: true, inputKey: 'log_retention_days', inputPlaceholder: '30', isNumber: true },
       site_announcement: { label: '网站公告弹窗', desc: '开启后前台弹出公告', hasMsg: true, msgKey: 'site_announcement_text', msgDefault: '欢迎访问！' },
     };
@@ -1035,7 +1036,7 @@ $isAdmin = $user && $user['role'] === 'admin';
             </button>
           </div>
           ${def.hasMsg ? `<div style="display:flex;gap:6px"><input id="msg-${def.msgKey}" value="${esc(msgVal)}" placeholder="${def.msgDefault}" style="flex:1;font-size:12px"><button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveFeatureMsg('${def.msgKey}')">保存</button></div>` : ''}
-          ${def.hasInput ? `<div style="display:flex;gap:6px">${def.isTextarea ? `<textarea id="inp-${def.inputKey}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px;min-height:40px;resize:vertical">${esc(features[def.inputKey]||'')}</textarea>` : `<input id="inp-${def.inputKey}" value="${esc(features[def.inputKey]||'')}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px" type="${def.isNumber?'number':'text'}" min="0">`}<button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveInputFeature('${def.inputKey}')">保存</button></div>` : ''}
+          ${def.hasInput ? `<div style="display:flex;gap:6px">${def.isTextarea ? `<textarea id="inp-${def.inputKey}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px;min-height:40px;resize:vertical">${esc(features[def.inputKey]||'')}</textarea>` : `<input id="inp-${def.inputKey}" value="${esc(features[def.inputKey]||'')}" placeholder="${def.inputPlaceholder}" style="flex:1;font-size:12px" type="${def.isNumber?'number':def.isDecimal?'number':'text'}" step="${def.isDecimal?'0.01':def.isNumber?'1':'any'}" min="0">`}<button class="btn" style="font-size:11px;padding:4px 12px" onclick="saveInputFeature('${def.inputKey}')">保存</button></div>` : ''}
         </div>`;
       }).join('');
     }
