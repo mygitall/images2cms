@@ -273,7 +273,7 @@ $isAdmin = $user && $user['role'] === 'admin';
           <div style="display:flex;gap:10px;margin-top:8px">
             <div style="flex:1;background:var(--popup-bg);border-radius:10px;padding:14px;border:1px solid var(--card-border)">
               <div style="font-weight:600;font-size:13px;margin-bottom:6px">导入数据</div>
-              <input type="file" id="import-file" accept=".json" style="font-size:12px;margin-bottom:6px">
+              <input type="file" id="import-file" accept=".sql" style="font-size:12px;margin-bottom:6px">
               <button class="btn" style="font-size:12px;padding:6px 14px" onclick="importData()">执行导入</button>
             </div>
             <div style="flex:1;background:var(--popup-bg);border-radius:10px;padding:14px;border:1px solid #fecaca">
@@ -988,7 +988,7 @@ $isAdmin = $user && $user['role'] === 'admin';
 
     async function importData() {
       const file = document.getElementById('import-file').files[0];
-      if (!file) { showMsg('请先选择 JSON 文件', 'err'); return; }
+      if (!file) { showMsg('请先选择 SQL 文件', 'err'); return; }
       const fd = new FormData(); fd.append('file', file);
       const res = await fetch('../api/backup.php?action=import', { method: 'POST', body: fd });
       const data = await res.json();
