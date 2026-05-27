@@ -262,6 +262,13 @@ $isAdmin = $user && $user['role'] === 'admin';
       <div class="card tab-content" id="tab-stats" style="display:none">
         <h2>用量统计仪表盘</h2>
         <div id="stats-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
+        <div id="visits-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
+        <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--text-secondary)">查询某天访问：</span>
+          <input type="date" id="visit-date-picker" style="padding:6px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;background:var(--popup-bg);color:var(--text)">
+          <button class="btn" style="font-size:12px;padding:6px 14px" onclick="queryVisitDate()">查询</button>
+          <span id="visit-date-result" style="font-size:13px;color:var(--success);margin-left:8px"></span>
+        </div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px">
           <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
             <h3 style="font-size:12px;font-weight:600;margin-bottom:6px">每日生成量（近30天）</h3>
@@ -848,6 +855,18 @@ $isAdmin = $user && $user['role'] === 'admin';
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
       </div>`).join('');
 
+      // 访问统计卡片
+      const v = data.visits || {};
+      document.getElementById('visits-overview').innerHTML = [
+        { label: '总访问次数', value: v.total || 0 },
+        { label: '今日访问', value: v.today || 0 },
+        { label: '昨日访问', value: v.yesterday || 0 },
+        { label: '近7天访问', value: v.last_7d || 0 },
+      ].map(d => `<div style="flex:1;min-width:80px;background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);text-align:center">
+        <div style="font-size:22px;font-weight:700;color:var(--success)">${d.value}</div>
+        <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
+      </div>`).join('');
+
       // 销毁旧图表
       Object.values(statsCharts).forEach(c => c.destroy());
       statsCharts = {};
@@ -937,6 +956,16 @@ $isAdmin = $user && $user['role'] === 'admin';
               </span>
             </div>`).join('');
       } catch (e) { box.innerHTML = '加载失败'; }
+    }
+
+    async function queryVisitDate() {
+      const date = document.getElementById('visit-date-picker').value;
+      if (!date) return;
+      const res = await fetch(`../api/admin.php?action=stats&date=${date}`);
+      const data = await res.json();
+      const cnt = data.visits?.date_query ?? 0;
+      document.getElementById('visit-date-result').textContent =
+        `${date} 访问次数：${cnt}`;
     }
 
     function esc(s) {

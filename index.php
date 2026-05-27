@@ -5395,6 +5395,17 @@ ${chinesePrompt}
       }
       loadFeatureToggles();
 
+      // ====== 访问统计埋点 ======
+      (function trackVisit() {
+        try {
+          fetch('api/visit.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ page: 'index' })
+          });
+        } catch (_) {}
+      })();
+
       // ====== 修改密码 ======
       const changepwBtn = document.getElementById('changepw-btn');
       const changepwDialog = document.getElementById('changepw-dialog');

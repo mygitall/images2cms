@@ -314,7 +314,64 @@ if ($action === 'stats') {
             (SELECT COUNT(*) FROM gen_images WHERE DATE(created_at) = CURDATE()) AS today_images"
     )->fetch();
 
-    ok(['daily' => $daily, 'models' => $models, 'users' => $users, 'today' => $today, 'overview' => $overview]);
+    // 访问统计
+    $visits = [];
+    try {
+        // 每日访问（近30天）
+        $visitsDaily = $pdo->query(
+            "SELECT visit_date AS day, SUM(visit_count) AS cnt FROM page_visits
+             WHERE visit_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+             GROUP BY visit_date ORDER BY day"
+        )->fetchAll();
+
+        // 今日访问
+        $visitsToday = $pdo->query(
+            "SELECT COALESCE(SUM(visit_count), 0) AS cnt FROM page_visits WHERE visit_date = CURDATE()"
+        )->fetchColumn();
+
+        // 昨日访问
+        $visitsYesterday = $pdo->query(
+            "SELECT COALESCE(SUM(visit_count), 0) AS cnt FROM page_visits
+             WHERE visit_date = DATE_SUB(CURDATE(), INTERVAL 1 DAY)"
+        )->fetchColumn();
+
+        // 总访问
+        $visitsTotal = $pdo->query("SELECT COALESCE(SUM(visit_count), 0) FROM page_visits")->fetchColumn();
+
+        // 近7天
+        $visits7d = $pdo->query(
+            "SELECT COALESCE(SUM(visit_count), 0) FROM page_visits
+             WHERE visit_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)"
+        )->fetchColumn();
+
+        // 某天查询（支持 ?date=2026-05-27）
+        $dateParam = $_GET['date'] ?? '';
+        $visitsDate = null;
+        if ($dateParam && preg_match('/^\d{4}-\d{2}-\d{2}$/', $dateParam)) {
+            $visitsDate = $pdo->query(
+                "SELECT COALESCE(SUM(visit_count), 0) FROM page_visits WHERE visit_date = '{$dateParam}'"
+            )->fetchColumn();
+        }
+
+        $visits = [
+            'total'       => (int)$visitsTotal,
+            'today'       => (int)$visitsToday,
+            'yesterday'   => (int)$visitsYesterday,
+            'last_7d'     => (int)$visits7d,
+            'daily'       => $visitsDaily,
+            'date_query'  => $visitsDate,
+            'date_param'  => $dateParam
+        ];
+    } catch (\Throwable $e) {}
+
+    ok([
+        'daily'   => $daily,
+        'models'  => $models,
+        'users'   => $users,
+        'today'   => $today,
+        'overview'=> $overview,
+        'visits'  => $visits
+    ]);
 }
 
 // ========== 全量操作日志（admin 专用）==========

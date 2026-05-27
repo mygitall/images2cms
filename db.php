@@ -37,6 +37,19 @@ $pdo->exec("
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 ");
 
+$pdo->exec("
+  CREATE TABLE IF NOT EXISTS `page_visits` (
+    `id`          INT AUTO_INCREMENT PRIMARY KEY,
+    `page`        VARCHAR(50) DEFAULT 'index',
+    `ip`          VARCHAR(45) DEFAULT '',
+    `visit_date`  DATE NOT NULL,
+    `visit_count` INT DEFAULT 1,
+    `created_at`  DATETIME DEFAULT CURRENT_TIMESTAMP,
+    `updated_at`  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `uk_page_date_ip` (`page`, `visit_date`, `ip`)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+
 // 自动清理 30 天前的旧日志（每次 5% 概率执行）
 if (mt_rand(1, 20) === 1) {
     try { $pdo->exec("DELETE FROM api_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)"); } catch (\Throwable $e) {}
