@@ -58,6 +58,9 @@ if ($action === 'full') {
 
 // ========== 导入 SQL ==========
 if ($action === 'import') {
+    @set_time_limit(600);
+    @ini_set('memory_limit', '512M');
+
     $file = $_FILES['file'] ?? null;
     if (!$file || $file['error'] !== UPLOAD_ERR_OK) {
         http_response_code(400);
@@ -75,33 +78,54 @@ if ($action === 'import') {
     $imported = 0;
     $errors = [];
 
-    // 按分号拆分，逐条执行（保留执行顺序）
-    $parts = explode(';', $sql);
+    // 按行流式解析：遇到 INSERT 语句直接执行，不等所有行读完
+    $lines = explode("\n", $sql);
+    $current = '';
+    $insertCount = 0;
+
     $pdo->beginTransaction();
     try {
-        foreach ($parts as $stmt) {
-            $stmt = trim($stmt);
-            if (empty($stmt)) continue;
-            if (strpos($stmt, '--') === 0 || strpos($stmt, '/*') === 0) continue;
+        foreach ($lines as $line) {
+            $trimmed = trim($line);
+            if ($trimmed === '' || $trimmed[0] === '-' || substr($trimmed, 0, 2) === '/*') continue;
 
-            $upper6 = strtoupper(substr($stmt, 0, 6));
-            if ($upper6 === 'INSERT') {
-                try {
-                    $pdo->exec($stmt);
-                    $imported++;
-                } catch (\Throwable $e) {
-                    $errors[] = substr($stmt, 0, 80) . '... — ' . $e->getMessage();
+            $current .= $line . "\n";
+
+            // 检测完整 SQL 语句（以分号结尾）
+            if (substr(rtrim($current), -1) === ';') {
+                $stmt = trim($current);
+                $current = '';
+
+                $upper6 = strtoupper(substr($stmt, 0, 6));
+                if ($upper6 === 'INSERT') {
+                    try {
+                        $pdo->exec($stmt);
+                        $insertCount++;
+                        $imported = $insertCount;
+                    } catch (\Throwable $e) {
+                        $errors[] = substr($stmt, 0, 80) . '... — ' . $e->getMessage();
+                    }
+                } elseif (preg_match('/^(DROP|CREATE|TRUNCATE|SET\s+FOREIGN|SET\s+NAMES)/i', $stmt)) {
+                    try { $pdo->exec($stmt); } catch (\Throwable $e) {}
                 }
-            } elseif (preg_match('/^(DROP|CREATE|TRUNCATE|SET\s+FOREIGN|SET\s+NAMES)/i', $stmt)) {
-                try { $pdo->exec($stmt); } catch (\Throwable $e) {}
             }
         }
+
+        // 处理最后未结束的语句
+        $stmt = trim($current);
+        if (!empty($stmt)) {
+            $upper6 = strtoupper(substr($stmt, 0, 6));
+            if ($upper6 === 'INSERT') {
+                try { $pdo->exec($stmt); $imported++; } catch (\Throwable $e) {}
+            }
+        }
+
         $pdo->commit();
     } catch (\Throwable $e) {
         $pdo->rollBack();
     }
 
-    // 处理 __CONFIG__ 标记（嵌入在 SQL 注释中）
+    // 处理 __CONFIG__ 和 __ENV__
     if (preg_match('/\/\*__CONFIG__\*\/(.*?)\/\*__ENDCONFIG__\*\//s', $sql, $m)) {
         $cfg = json_decode($m[1], true);
         if ($cfg) {
@@ -109,8 +133,6 @@ if ($action === 'import') {
             file_put_contents(__DIR__ . '/../config.php', "<?php\nreturn {$export};\n");
         }
     }
-
-    // 处理 __ENV__ 标记
     if (preg_match('/\/\*__ENV__\*\/(.*?)\/\*__ENDENV__\*\//s', $sql, $m)) {
         $envData = json_decode($m[1], true);
         if ($envData && !empty($envData['keys'])) {
