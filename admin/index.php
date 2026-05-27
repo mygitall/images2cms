@@ -1018,6 +1018,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       global_total_limit:{ label: '全局总生图上限', desc: '所有用户合计最多生图数（0=不限）', hasInput: true, inputKey: 'global_total_max', inputPlaceholder: '0', isNumber: true },
       new_user_free:    { label: '新用户免费生图数', desc: '注册后每人可免费生图次数（默认1）', hasInput: true, inputKey: 'new_user_free_count', inputPlaceholder: '1', isNumber: true },
       log_retention_days: { label: '日志保留天数', desc: 'API日志和操作记录保留天数（默认30）', hasInput: true, inputKey: 'log_retention_days', inputPlaceholder: '30', isNumber: true },
+      site_announcement: { label: '网站公告弹窗', desc: '开启后前台弹出公告', hasMsg: true, msgKey: 'site_announcement_text', msgDefault: '欢迎访问！' },
     };
     async function loadToggles() {
       const res = await fetch('../api/admin.php?action=features');
