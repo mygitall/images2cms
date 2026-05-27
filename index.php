@@ -5378,7 +5378,6 @@ ${chinesePrompt}
         try {
           const res = await fetch('api/features.php');
           features = await res.json();
-          // 标准化布尔值（PHP json_encode 可能返回字符串 "true"/"false"）
           ['show_folder_card','show_presets','disable_register'].forEach(k => {
             if (features[k] === 'false' || features[k] === false) features[k] = false;
             else if (features[k] === 'true' || features[k] === true) features[k] = true;
@@ -5391,29 +5390,26 @@ ${chinesePrompt}
             const el = document.querySelector('.card-presets');
             if (el) el.style.display = 'none';
           }
+          // 网站公告弹窗
+          if (features.site_announcement !== false && features.site_announcement !== 'false') {
+            var text = features.site_announcement_text || '';
+            if (text) {
+              var key = 'ann_' + text.length;
+              for (var i = 0; i < Math.min(text.length, 5); i++) key += '_' + text.charCodeAt(i);
+              if (localStorage.getItem(key) !== '1') {
+                var o = document.createElement('div');
+                o.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
+                o.innerHTML = '<div style="background:#1f2937;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)"><div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">网站公告</div><div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">' + text.replace(/</g,'&lt;') + '</div><button id="ann-close2" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button></div>';
+                document.body.appendChild(o);
+                var cb = function() { o.remove(); localStorage.setItem(key, '1'); };
+                o.querySelector('#ann-close2').onclick = cb;
+                o.addEventListener('click', function(e) { if (e.target === o) cb(); });
+              }
+            }
+          }
         } catch (_) {}
       }
       loadFeatureToggles();
-
-      // ====== 网站公告弹窗（复用在 loadFeatureToggles 之后立即展示） ======
-      (function showAnnouncement() {
-        if (features.site_announcement === false || features.site_announcement === 'false') return;
-        var text = features.site_announcement_text || '';
-        if (!text) return;
-        var key = 'ann_' + text.length;
-        for (var i = 0; i < Math.min(text.length, 5); i++) key += '_' + text.charCodeAt(i);
-        if (localStorage.getItem(key) === '1') return;
-        var overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center';
-        var html = '<div style="background:#1f2937;border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:32px;max-width:480px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)">';
-        html += '<div style="font-size:18px;font-weight:700;color:#e5e7eb;margin-bottom:16px">网站公告</div>';
-        html += '<div style="font-size:14px;color:#94a3b8;line-height:1.7;white-space:pre-wrap;margin-bottom:24px">' + text.replace(/</g,'&lt;') + '</div>';
-        html += '<button id="ann-close" style="padding:10px 24px;border-radius:8px;border:none;background:#22d3ee;color:#0b1220;font-weight:700;cursor:pointer;font-size:14px">我知道了</button></div>';
-        overlay.innerHTML = html;
-        document.body.appendChild(overlay);
-        document.getElementById('ann-close').onclick = function() { overlay.remove(); localStorage.setItem(key, '1'); };
-        overlay.addEventListener('click', function(e) { if (e.target === overlay) { overlay.remove(); localStorage.setItem(key, '1'); } });
-      })();
 
       // ====== 访问统计埋点 ======
       (function trackVisit() {
