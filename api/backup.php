@@ -64,6 +64,17 @@ if ($action === 'full') {
     }
     unset($cfg['save_dir']);
     $all['config'] = [$cfg];
+
+    // 导出 .env 设置（脱敏：去掉数据库密码）
+    $envFile = __DIR__ . '/../../.env';
+    $all['env'] = '';
+    if (file_exists($envFile)) {
+        $envContent = file_get_contents($envFile);
+        // 移除 DB_PASS 和含 key/secret 的行
+        $envContent = preg_replace('/^(DB_PASS|DB_USER|DB_NAME|DB_HOST|DB_PORT|CIYUAN_API_KEY|SUPABASE_SERVICE_ROLE_KEY|STRIPE_SECRET_KEY|STRIPE_WEBHOOK_SECRET|GOOGLE_ANALYTICS_CLIENT_SECRET|GOOGLE_ANALYTICS_REFRESH_TOKEN|GOOGLE_ANALYTICS_PRIVATE_KEY)=.*$/m', '# $1=*** 已脱敏，导入后需手动填写', $envContent);
+        $all['env'] = $envContent;
+    }
+
     exportJson($all, 'full_backup_' . date('Ymd-His') . '.json');
 }
 
@@ -156,6 +167,28 @@ if ($action === 'import') {
     if (!empty($data['config'][0])) {
         $export = var_export($data['config'][0], true);
         file_put_contents(__DIR__ . '/../config.php', "<?php\nreturn {$export};\n");
+    }
+
+    // 导入 .env（仅恢复未被注释的行）
+    if (!empty($data['env'])) {
+        $envFile = __DIR__ . '/../../.env';
+        if (file_exists($envFile)) {
+            $existing = file_get_contents($envFile);
+            // 只替换未脱敏的行（以 # 开头的跳过）
+            $lines = explode("\n", $data['env']);
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || $line[0] === '#') continue;
+                $eq = strpos($line, '=');
+                if ($eq === false) continue;
+                $key = trim(substr($line, 0, $eq));
+                // 只更新非敏感 key
+                if (in_array($key, ['APP_URL','CIYUAN_BASE_URL','VITE_SUPABASE_URL','VITE_SUPABASE_ANON_KEY','SUPER_ADMIN_EMAILS','VITE_GA_MEASUREMENT_ID','GA4_PROPERTY_ID','GOOGLE_ANALYTICS_CLIENT_ID','GOOGLE_ANALYTICS_CLIENT_EMAIL','GOOGLE_ANALYTICS_REDIRECT_URI'])) {
+                    $existing = preg_replace("/^{$key}=.*$/m", $line, $existing);
+                }
+            }
+            file_put_contents($envFile, $existing);
+        }
     }
 
     header('Content-Type: application/json; charset=utf-8');
