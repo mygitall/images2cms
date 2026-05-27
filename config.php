@@ -23,6 +23,7 @@ return array (
     'global_total_max' => '0',
     'global_daily_max' => '0',
     'banned_ips_list' => '0',
+    'gen_cost_yuan' => '0.4',
   ),
   'installed' => true,
 );
