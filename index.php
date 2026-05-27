@@ -5402,7 +5402,7 @@ ${chinesePrompt}
           const f = await res.json();
           if (f.site_announcement !== false) {
             const text = f.site_announcement_text || '';
-            const key = 'announcement_dismissed_' + (text ? btoa(text).slice(0,20) : 'empty');
+            const key = 'ann_dismiss_' + (text ? text.length + '_' + text.charCodeAt(0) + '_' + text.charCodeAt(Math.floor(text.length/2)) : 'empty');
             if (text && localStorage.getItem(key) !== '1') {
               const overlay = document.createElement('div');
               overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;animation:fadeIn .3s';
