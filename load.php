@@ -25,17 +25,20 @@ if (!preg_match('/^[a-zA-Z0-9_\-\.]+$/', $file)) {
     exit;
 }
 
-// 先查用户子目录，找不到则查根目录
-$rootDir = $saveDir;
+// 查用户子目录（兼容主 app 和 images20 两种 uploads 路径）
+$found = false;
 if (!empty($user) && preg_match('/^[a-zA-Z0-9_\x{4e00}-\x{9fa5}\-]+$/u', $user)) {
-    $filePath = $saveDir . '/' . $user . '/' . $file;
-    if (file_exists($filePath)) {
-        $found = true;
+    // 主 app 的 uploads 路径
+    $mainUploads = dirname($saveDir) . '/htdocs/uploads/' . $user . '/' . $file;
+    // images20 自己的 uploads
+    $img20Uploads = $saveDir . '/' . $user . '/' . $file;
+    foreach ([$mainUploads, $img20Uploads] as $fp) {
+        if (file_exists($fp)) { $filePath = $fp; $found = true; break; }
     }
 }
 
-if (empty($found)) {
-    $filePath = $rootDir . '/' . $file;
+if (!$found) {
+    $filePath = $saveDir . '/' . $file;
 }
 
 if (!file_exists($filePath)) {

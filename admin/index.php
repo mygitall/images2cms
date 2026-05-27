@@ -177,9 +177,11 @@ $isAdmin = $user && $user['role'] === 'admin';
     <div class="login-box" id="login-box">
       <h2 id="login-title">登录后台</h2>
       <div class="err-msg" id="login-error" style="display:none"></div>
-      <input id="login-username" type="text" placeholder="用户名">
-      <input id="login-password" type="password" placeholder="密码">
-      <button class="btn" id="login-submit" style="width:100%;margin-top:4px;">登录</button>
+      <form onsubmit="doLogin();return false" style="margin:0">
+      <input id="login-username" type="text" placeholder="用户名" autocomplete="username">
+      <input id="login-password" type="password" placeholder="密码" autocomplete="current-password">
+      <button class="btn" id="login-submit" type="submit" style="width:100%;margin-top:4px;">登录</button>
+      </form>
       <div class="switch">没有账号？<a id="login-switch">去前台注册</a></div>
     </div>
 
@@ -227,10 +229,10 @@ $isAdmin = $user && $user['role'] === 'admin';
 
       <div class="card tab-content" id="tab-users" style="display:none">
         <h2>用户列表</h2>
-        <div class="inline-form" style="margin-bottom:16px;justify-content:space-between">
-          <input id="new-username" placeholder="用户名"><input id="new-password" placeholder="密码" type="password">
+        <form class="inline-form" style="margin-bottom:16px;justify-content:space-between" onsubmit="createUser();return false">
+          <input id="new-username" placeholder="用户名" autocomplete="off"><input id="new-password" placeholder="密码" type="password" autocomplete="new-password">
           <select id="new-role"><option value="user">普通用户</option><option value="admin">管理员</option></select>
-          <button class="btn" onclick="createUser()">添加用户</button>
+          <button class="btn" type="submit">添加用户</button>
           <input id="user-search" placeholder="搜索用户名..." style="width:200px" oninput="searchUsers()">
           <button class="btn" onclick="openBatchTopup()" style="font-size:12px;padding:8px 14px">批量加积分</button>
         </div>
