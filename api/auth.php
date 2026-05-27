@@ -38,6 +38,15 @@ function jsonOut($data, $code = 200) {
 
 // ========== 注册 ==========
 if ($action === 'register') {
+    $config = require __DIR__ . '/../config.php';
+    $features = $config['features'] ?? [];
+
+    // 禁止注册
+    if (!empty($features['disable_register'])) {
+        $msg = $features['register_block_msg'] ?? '暂时停止注册';
+        jsonOut(['error' => $msg], 403);
+    }
+
     $username = trim($input['username'] ?? '');
     $password = $input['password'] ?? '';
 
@@ -45,8 +54,6 @@ if ($action === 'register') {
     if (strlen($password) < 4) jsonOut(['error' => '密码至少 4 位'], 400);
 
     // IP 黑名单
-    $config = require __DIR__ . '/../config.php';
-    $features = $config['features'] ?? [];
     $bannedIPs = array_map('trim', explode(',', $features['banned_ips_list'] ?? ''));
     $clientIP  = $_SERVER['REMOTE_ADDR'] ?? '';
     if (!empty($bannedIPs[0]) && in_array($clientIP, $bannedIPs)) {

@@ -5321,7 +5321,7 @@ ${chinesePrompt}
       authSubmit.addEventListener('click', doAuth);
       authSwitch.addEventListener('click', (e) => {
         e.preventDefault();
-        if (authMode === 'login' && features.disable_register) {
+        if (authMode === 'login' && (features.disable_register === true || features.disable_register === 'true')) {
           alert(features.register_block_msg || '暂时停止注册');
           return;
         }
@@ -5378,10 +5378,11 @@ ${chinesePrompt}
         try {
           const res = await fetch('api/features.php');
           features = await res.json();
-          // 字符串值需转回布尔
-          if (features.show_folder_card === 'false') features.show_folder_card = false;
-          if (features.show_presets === 'false') features.show_presets = false;
-          if (features.disable_register === 'false') features.disable_register = false;
+          // 标准化布尔值（PHP json_encode 可能返回字符串 "true"/"false"）
+          ['show_folder_card','show_presets','disable_register'].forEach(k => {
+            if (features[k] === 'false' || features[k] === false) features[k] = false;
+            else if (features[k] === 'true' || features[k] === true) features[k] = true;
+          });
           if (!features.show_folder_card) {
             const el = document.querySelector('.card-folder');
             if (el) el.style.display = 'none';
