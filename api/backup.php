@@ -27,10 +27,14 @@ $input  = json_decode(file_get_contents('php://input'), true) ?? [];
 
 // 表名 → 中文名映射
 $tables = [
-    'gen_images' => '图片记录',
-    'users'      => '用户管理',
-    'login_logs' => '登录日志',
-    'api_logs'   => '操作记录',
+    'gen_images'     => '图片记录',
+    'users'          => '用户管理',
+    'login_logs'     => '登录日志',
+    'api_logs'       => 'API调用日志',
+    'balance_logs'   => '积分流水',
+    'case_favorites' => '案例收藏',
+    'page_visits'    => '访问统计',
+    'admin_audit'    => '管理员审计',
 ];
 
 if ($action === 'tables') {
@@ -51,8 +55,15 @@ if ($action === 'full') {
     foreach ($tables as $t => $label) {
         $all[$t] = $pdo->query("SELECT * FROM `{$t}`")->fetchAll();
     }
-    // 加上 config.php
-    $all['config'] = [require __DIR__ . '/../config.php'];
+    // config 脱敏：不要导出 api_key、base_url、save_dir 敏感信息
+    $cfg = require __DIR__ . '/../config.php';
+    if (isset($cfg['profiles'])) {
+        foreach ($cfg['profiles'] as &$p) {
+            unset($p['api_key'], $p['base_url']);
+        }
+    }
+    unset($cfg['save_dir']);
+    $all['config'] = [$cfg];
     exportJson($all, 'full_backup_' . date('Ymd-His') . '.json');
 }
 
@@ -95,7 +106,12 @@ if ($action === 'import') {
     // 支持完整备份或单表备份
     $data = isset($json['gen_images']) ? $json : ['gen_images' => $json];
 
-    $tableMap = ['gen_images' => 'gen_images', 'users' => 'users', 'login_logs' => 'login_logs', 'api_logs' => 'api_logs'];
+    $tableMap = [
+        'gen_images' => 'gen_images', 'users' => 'users',
+        'login_logs' => 'login_logs', 'api_logs' => 'api_logs',
+        'balance_logs' => 'balance_logs', 'case_favorites' => 'case_favorites',
+        'page_visits' => 'page_visits', 'admin_audit' => 'admin_audit'
+    ];
     foreach ($tableMap as $key => $table) {
         if (!empty($data[$key]) && is_array($data[$key])) {
             foreach ($data[$key] as $row) {
