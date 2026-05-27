@@ -7,6 +7,11 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0);
 
 require_once __DIR__ . '/../db.php';
+
+// 后台管理使用独立 session，避免被前台登录影响
+if (!empty($_GET['admin'])) {
+    session_name('IMAGES20_ADMIN');
+}
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 $action = $_GET['action'] ?? '';
@@ -95,10 +100,6 @@ if ($action === 'login') {
     }
 
     $_SESSION['user'] = ['id' => $user['id'], 'username' => $user['username'], 'role' => $user['role']];
-    // 管理员独立会话，避免被前台用户登录挤掉
-    if ($user['role'] === 'admin') {
-        $_SESSION['admin'] = $_SESSION['user'];
-    }
 
     // 记录登录日志（优先获取公网 IP）
     $ip = $_SERVER['REMOTE_ADDR'] ?? '';

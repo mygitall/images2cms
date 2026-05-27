@@ -5,8 +5,9 @@ if (file_exists(__DIR__ . '/../config.php')) {
 } else {
     header('Location: ../install.php'); exit;
 }
+session_name('IMAGES20_ADMIN');
 session_start();
-$user = $_SESSION['admin'] ?? $_SESSION['user'] ?? null;
+$user = $_SESSION['user'] ?? null;
 $isAdmin = $user && $user['role'] === 'admin';
 ?><!doctype html>
 <html lang="zh">
@@ -333,7 +334,7 @@ $isAdmin = $user && $user['role'] === 'admin';
       const submitBtn = document.getElementById('login-submit');
       submitBtn.disabled = true; submitBtn.textContent = '登录中...';
       try {
-        const res = await fetch('../api/auth.php?action=login', {
+        const res = await fetch('../api/auth.php?action=login&admin=1', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password })
         });
@@ -351,7 +352,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     }
 
     async function doLogout() {
-      await fetch('../api/auth.php?action=logout', { method: 'POST' });
+      await fetch('../api/auth.php?action=logout&admin=1', { method: 'POST' });
       location.reload();
     }
 
