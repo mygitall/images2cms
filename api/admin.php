@@ -432,6 +432,14 @@ if ($action === 'stats') {
             )->fetchColumn();
         }
 
+        // 时段分布
+        $hours = $pdo->query("SELECT HOUR(created_at) AS hr, COUNT(*) AS cnt FROM page_visits
+            WHERE visit_date = CURDATE() GROUP BY HOUR(created_at) ORDER BY hr")->fetchAll();
+
+        // Top IP
+        $topIps = $pdo->query("SELECT ip, SUM(visit_count) AS cnt FROM page_visits
+            GROUP BY ip ORDER BY cnt DESC LIMIT 15")->fetchAll();
+
         $visits = [
             'total'       => (int)$visitsTotal,
             'today'       => (int)$visitsToday,
@@ -439,7 +447,9 @@ if ($action === 'stats') {
             'last_7d'     => (int)$visits7d,
             'daily'       => $visitsDaily,
             'date_query'  => $visitsDate,
-            'date_param'  => $dateParam
+            'date_param'  => $dateParam,
+            'hours'       => $hours,
+            'top_ips'     => $topIps,
         ];
     } catch (\Throwable $e) {}
 
@@ -472,13 +482,39 @@ if ($action === 'stats') {
         exit;
     }
 
+    // API Key 健康状况
+    $apiHealth = ['status' => 'unknown', 'message' => ''];
+    $config = require __DIR__ . '/../config.php';
+    $activeProfile = $config['profiles'][$config['active'] ?? 'default'] ?? [];
+    if (!empty($activeProfile['api_key'])) {
+        $ch = curl_init(rtrim($activeProfile['base_url'], '/') . '/v1/models');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 5,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $activeProfile['api_key']]
+        ]);
+        curl_exec($ch);
+        $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        $apiHealth['status'] = $code === 200 ? 'ok' : ($code === 401 || $code === 403 ? 'invalid' : 'error');
+        $apiHealth['http_code'] = $code;
+    }
+
+    // 今日 API 调用次数和失败次数
+    $apiStats = $pdo->query("SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status='error' THEN 1 ELSE 0 END) AS errors
+        FROM api_logs WHERE DATE(created_at) = CURDATE()")->fetch();
+
     ok([
-        'daily'   => $daily,
-        'models'  => $models,
-        'users'   => $users,
-        'today'   => $today,
-        'overview'=> $overview,
-        'visits'  => $visits
+        'daily'      => $daily,
+        'models'     => $models,
+        'users'      => $users,
+        'today'      => $today,
+        'overview'   => $overview,
+        'visits'     => $visits,
+        'api_health' => $apiHealth,
+        'api_stats'  => $apiStats,
     ]);
 }
 

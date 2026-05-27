@@ -45,6 +45,20 @@ $isAdmin = $user && $user['role'] === 'admin';
       --popup-border: rgba(255,255,255,0.1);
       --accent-bg: rgba(255,255,255,0.04);
     }
+    [data-theme="dark"] ::-webkit-scrollbar { width: 6px; }
+    [data-theme="dark"] ::-webkit-scrollbar-track { background: #1a1a1a; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    [data-theme="dark"] input:not(.login-box input), [data-theme="dark"] select, [data-theme="dark"] textarea {
+      background: #2a2a2a; color: #eee; border-color: rgba(255,255,255,0.12);
+    }
+    [data-theme="dark"] .tabs { background: rgba(255,255,255,0.04); }
+    [data-theme="dark"] .tabs button.active { box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+    [data-theme="dark"] .btn-ghost { color: #aaa; border-color: rgba(255,255,255,0.12); }
+    [data-theme="dark"] .btn-ghost:hover { border-color: rgba(255,255,255,0.25); color: #eee; }
+    [data-theme="dark"] .login-box input { background: #2a2a2a; color: #eee; }
+    [data-theme="dark"] .stat-box { background: #2a2a2a; }
+    [data-theme="dark"] .dialog-content { background: #2a2a2a; }
+    [data-theme="dark"] .dialog-btn-cancel { background: rgba(255,255,255,0.08); color: #ccc; }
 
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -144,8 +158,16 @@ $isAdmin = $user && $user['role'] === 'admin';
     .err-msg { color: var(--danger); font-size: 13px; margin-bottom: 10px; text-align: center; }
 
     @media (max-width: 768px) {
-      .app { padding: 20px 14px; }
+      .app { padding: 12px 8px; }
       .card { padding: 16px; }
+      .tabs { overflow-x: auto; white-space: nowrap; width: 100%; }
+      table { font-size: 11px; }
+      th, td { padding: 6px 4px; }
+      th:nth-child(4), td:nth-child(4) { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .header { flex-direction: column; align-items: flex-start; }
+      .user-info { flex-wrap: wrap; }
+      .stat-row { flex-wrap: wrap; }
+      .stat-box { min-width: 60px; padding: 8px; }
     }
   </style>
 </head>
@@ -164,7 +186,7 @@ $isAdmin = $user && $user['role'] === 'admin';
     <!-- ====== 管理面板 ====== -->
     <div class="panel <?= $isAdmin ? 'active' : '' ?>" id="admin-panel">
       <div class="header">
-        <h1>Image Studio 后台</h1>
+        <h1>Image Studio 后台 <span id="api-warning-badge" style="display:none;background:var(--danger);color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;margin-left:8px;font-weight:600;vertical-align:middle">API异常</span></h1>
         <div class="user-info">
           <span class="user-tag" id="admin-username"></span>
           <a href="../index.php">回前台</a>
@@ -272,6 +294,16 @@ $isAdmin = $user && $user['role'] === 'admin';
         <h2>用量统计仪表盘 <a class="btn" href="../api/admin.php?action=stats&format=csv" target="_blank" style="font-size:12px;padding:6px 14px;text-decoration:none;margin-left:12px">导出CSV</a></h2>
         <div id="stats-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
         <div id="visits-overview" style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-top:10px">
+          <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+            <h3 style="font-size:12px;font-weight:600;margin-bottom:8px">访问时段分布</h3>
+            <div id="visit-hours" style="max-height:200px;overflow-y:auto"></div>
+          </div>
+          <div style="background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border)">
+            <h3 style="font-size:12px;font-weight:600;margin-bottom:8px">访问 Top IP</h3>
+            <div id="visit-ips" style="max-height:200px;overflow-y:auto"></div>
+          </div>
+        </div>
         <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;flex-wrap:wrap">
           <span style="font-size:13px;color:var(--text-secondary)">查询某天访问：</span>
           <input type="date" id="visit-date-picker" style="padding:6px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;background:var(--popup-bg);color:var(--text)">
@@ -401,15 +433,22 @@ $isAdmin = $user && $user['role'] === 'admin';
     let imagesPage = 1;
 
     // 已登录 → 直接显示面板
-    // 主题切换
-    const adminThemeToggle = document.getElementById('admin-theme-toggle');
-    const savedTheme = localStorage.getItem('app-theme') || 'light';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-    adminThemeToggle.addEventListener('click', () => {
+    // 主题切换（优先 localStorage，其次系统偏好，默认 light）
+    function getSystemTheme() {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('app-theme', theme);
+      const toggleBtn = document.getElementById('admin-theme-toggle');
+      if (toggleBtn) toggleBtn.innerHTML = theme === 'dark' ? '&#9789;' : '&#9788;';
+    }
+    const savedTheme = localStorage.getItem('app-theme');
+    const initialTheme = savedTheme || getSystemTheme();
+    applyTheme(initialTheme);
+    document.getElementById('admin-theme-toggle').addEventListener('click', () => {
       const cur = document.documentElement.getAttribute('data-theme');
-      const next = cur === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('app-theme', next);
+      applyTheme(cur === 'dark' ? 'light' : 'dark');
     });
 
     <?php if ($isAdmin): ?>
@@ -1052,10 +1091,24 @@ $isAdmin = $user && $user['role'] === 'admin';
         { label: '今日生成', value: ov.today_images || 0 },
         { label: '总用户数', value: ov.total_users || 0 },
         { label: '已删图片', value: ov.deleted_images || 0 },
+        { label: 'API 状态', value: (data.api_health?.status === 'ok' ? '正常' : data.api_health?.status === 'invalid' ? 'Key无效' : '异常'), extra: data.api_health?.status === 'ok' ? 'var(--success)' : 'var(--danger)' },
+        { label: '今日API调用', value: (data.api_stats?.total || 0) },
+        { label: '今日失败', value: (data.api_stats?.errors || 0), extra: (data.api_stats?.errors > 0 ? 'var(--danger)' : '') },
       ].map(d => `<div style="flex:1;min-width:80px;background:var(--popup-bg);border-radius:8px;padding:10px 14px;border:1px solid var(--card-border);text-align:center">
-        <div style="font-size:22px;font-weight:700">${d.value}</div>
+        <div style="font-size:22px;font-weight:700;${d.extra ? 'color:' + d.extra : ''}">${d.value}</div>
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
       </div>`).join('');
+
+      // API 状态警告徽章
+      const badge = document.getElementById('api-warning-badge');
+      if (badge) {
+        if (data.api_health?.status === 'error' || data.api_health?.status === 'invalid') {
+          badge.style.display = '';
+          badge.textContent = data.api_health?.status === 'invalid' ? 'API Key无效' : 'API异常';
+        } else {
+          badge.style.display = 'none';
+        }
+      }
 
       // 访问统计卡片
       const v = data.visits || {};
@@ -1068,6 +1121,45 @@ $isAdmin = $user && $user['role'] === 'admin';
         <div style="font-size:22px;font-weight:700;color:var(--success)">${d.value}</div>
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">${d.label}</div>
       </div>`).join('');
+
+      // 访问时段分布
+      const hoursData = v.hours || [];
+      const hoursEl = document.getElementById('visit-hours');
+      if (hoursEl) {
+        if (hoursData.length) {
+          const maxHr = Math.max(...hoursData.map(h => parseInt(h.cnt)));
+          hoursEl.innerHTML = hoursData.map(h => {
+            const pct = maxHr > 0 ? (parseInt(h.cnt) / maxHr * 100).toFixed(0) : 0;
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:11px">
+              <span style="width:36px;color:var(--text-tertiary);text-align:right">${String(h.hr).padStart(2,'0')}:00</span>
+              <span style="flex:1;height:14px;background:rgba(59,130,246,0.1);border-radius:3px;overflow:hidden">
+                <span style="display:block;height:100%;background:#3b82f6;border-radius:3px;width:${pct}%;min-width:2px"></span>
+              </span>
+              <span style="width:28px;color:var(--text-secondary);text-align:right;font-weight:500">${h.cnt}</span>
+            </div>`;
+          }).join('');
+        } else {
+          hoursEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:11px">暂无数据</div>';
+        }
+      }
+
+      // Top IP
+      const ipsData = v.top_ips || [];
+      const ipsEl = document.getElementById('visit-ips');
+      if (ipsEl) {
+        if (ipsData.length) {
+          ipsEl.innerHTML = ipsData.map((r, i) => {
+            const color = i < 3 ? 'var(--danger)' : 'var(--text-secondary)';
+            return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;font-size:11px">
+              <span style="width:18px;color:var(--text-tertiary);text-align:right;font-weight:600">${i+1}</span>
+              <span style="flex:1;font-family:monospace;font-size:10px">${esc(r.ip)}</span>
+              <span style="color:${color};font-weight:500">${r.cnt}</span>
+            </div>`;
+          }).join('');
+        } else {
+          ipsEl.innerHTML = '<div style="color:var(--text-tertiary);font-size:11px">暂无数据</div>';
+        }
+      }
 
       // 销毁旧图表
       Object.values(statsCharts).forEach(c => c.destroy());
